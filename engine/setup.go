@@ -138,6 +138,26 @@ func (chess *Chess) Clone() *Chess {
 	return clone
 }
 
+func (chess *Chess) Copy(c *Chess) {
+	chess.WhitePawns = c.WhitePawns
+	chess.WhiteRooks = c.WhiteRooks
+	chess.WhiteKnights = c.WhiteKnights
+	chess.WhiteBishops = c.WhiteBishops
+	chess.WhiteQueens = c.WhiteQueens
+	chess.WhiteKing = c.WhiteKing
+	chess.BlackPawns = c.BlackPawns
+	chess.BlackRooks = c.BlackRooks
+	chess.BlackKnights = c.BlackKnights
+	chess.BlackBishops = c.BlackBishops
+	chess.BlackQueens = c.BlackQueens
+	chess.BlackKing = c.BlackKing
+	chess.CastlingPrivilege = c.CastlingPrivilege
+	chess.EnPassantTarget = c.EnPassantTarget
+	chess.Fullmove = c.Fullmove
+	chess.Halfmove = c.Halfmove
+	chess.SideToMove = c.SideToMove
+}
+
 // Method to return a string array representation of the chessboard
 // Useful when it's not resource-intense operation like display
 func (chess *Chess) ToArray() [64]string {
