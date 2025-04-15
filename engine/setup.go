@@ -158,6 +158,15 @@ func (chess *Chess) Copy(c *Chess) {
 	chess.SideToMove = c.SideToMove
 }
 
+func (chess *Chess) Flip() {
+	chess.WhitePawns, chess.BlackPawns = FlipVertical(chess.BlackPawns), FlipVertical(chess.WhitePawns)
+	chess.WhiteRooks, chess.BlackRooks = FlipVertical(chess.BlackRooks), FlipVertical(chess.WhiteRooks)
+	chess.WhiteKnights, chess.BlackKnights = FlipVertical(chess.BlackKnights), FlipVertical(chess.WhiteKnights)
+	chess.WhiteBishops, chess.BlackBishops = FlipVertical(chess.BlackBishops), FlipVertical(chess.WhiteBishops)
+	chess.WhiteQueens, chess.BlackQueens = FlipVertical(chess.BlackQueens), FlipVertical(chess.WhiteQueens)
+	chess.WhiteKing, chess.BlackKing = FlipVertical(chess.BlackKing), FlipVertical(chess.WhiteKing)
+}
+
 // Method to return a string array representation of the chessboard
 // Useful when it's not resource-intense operation like display
 func (chess *Chess) ToArray() [64]string {

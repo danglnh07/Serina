@@ -19,52 +19,9 @@ func (chess *Chess) GenerateAllBlacks() uint64 {
 
 // Method that calculate danger squares bitboard of Black King
 func (chess *Chess) GenerateBlackKingInDanger() uint64 {
-	var (
-		whites_empty_blackKing  = ^chess.GenerateAllBlacks() | chess.BlackKing
-		FILE_A, FILE_H          = FILE_MASK[0], FILE_MASK[7]
-		temp, blackInDanger, bk uint64
-		index                   int
-	)
-
-	//Temporary remove the Black King
-	bk = chess.BlackKing
-	chess.BlackKing = 0
-
-	//Calculate for white pawns (en passant will never threaten a King -> ignored)
-	blackInDanger |= (chess.WhitePawns << 9) & whites_empty_blackKing & ^FILE_H
-	blackInDanger |= (chess.WhitePawns << 7) & whites_empty_blackKing & ^FILE_A
-
-	//Calculate for white rooks and white queens (horizontal and vertical only)
-	temp = chess.WhiteRooks | chess.WhiteQueens
-	for temp != 0 {
-		index = bits.TrailingZeros64(temp)
-		blackInDanger |= HAndVMoves(index, chess) & whites_empty_blackKing
-		ClearBit(index, &temp)
-	}
-
-	//Calculate for white knights
-	temp = chess.WhiteKnights
-	for temp != 0 {
-		index = bits.TrailingZeros64(temp)
-		blackInDanger |= KNIGHT_ATTACK[index] & whites_empty_blackKing
-		ClearBit(index, &temp)
-	}
-
-	//Calculate for white bishops and white queens (diagonal and anti diagonal only)
-	temp = chess.WhiteBishops | chess.WhiteQueens
-	for temp != 0 {
-		index = bits.TrailingZeros64(temp)
-		blackInDanger |= DAndAntiDMoves(index, chess) & whites_empty_blackKing
-		ClearBit(index, &temp)
-	}
-
-	//Calculate for white king (There can be only 1 King -> no need for loop)
-	index = bits.TrailingZeros64(chess.WhiteKing)
-	blackInDanger |= KING_ATTACK[index] & whites_empty_blackKing
-
-	//Restore the value of black King
-	chess.BlackKing = bk
-	return blackInDanger
+	chess.Flip()
+	defer chess.Flip()
+	return FlipVertical(chess.GenerateWhiteKingInDanger())
 }
 
 /*
@@ -75,50 +32,9 @@ func (chess *Chess) GenerateBlackKingInDanger() uint64 {
 
 // Calculate Black attack bitboard
 func (chess *Chess) GenerateBlackAttacks() uint64 {
-	var (
-		FILE_A, FILE_H = FILE_MASK[0], FILE_MASK[7]
-		//blacks cannot land to squares that is occupied by another blacks, so we negate blacks bitboard
-		whites, blacksCanLandTo = chess.GenerateAllWhites(), ^chess.GenerateAllBlacks()
-		temp, blackCanAttack    uint64
-		index                   int
-	)
-
-	//Calculate black pawns attack squares
-	blackCanAttack |= (chess.BlackPawns >> 9) & whites & ^FILE_A
-	blackCanAttack |= (chess.BlackPawns >> 7) & whites & ^FILE_H
-	if 23 >= chess.EnPassantTarget && chess.EnPassantTarget >= 16 {
-		blackCanAttack |= 0x1 << chess.EnPassantTarget
-	}
-
-	//Calculate black rooks and black queens (horizontal and vertical only) attack squares
-	temp = chess.BlackRooks | chess.BlackQueens
-	for temp != 0 {
-		index = bits.TrailingZeros64(temp)
-		blackCanAttack |= HAndVMoves(index, chess) & blacksCanLandTo
-		ClearBit(index, &temp)
-	}
-
-	//Calculate black knights attack squares
-	temp = chess.BlackKnights
-	for temp != 0 {
-		index = bits.TrailingZeros64(temp)
-		blackCanAttack |= KNIGHT_ATTACK[index] & blacksCanLandTo
-		ClearBit(index, &temp)
-	}
-
-	//Calculate black bishops and black queens (diagonal and anti diagonal only) attack squares
-	temp = chess.BlackBishops | chess.BlackQueens
-	for temp != 0 {
-		index = bits.TrailingZeros64(temp)
-		blackCanAttack |= DAndAntiDMoves(index, chess) & blacksCanLandTo
-		ClearBit(index, &temp)
-	}
-
-	//Calculate black king attack squares (since there is only one King, no need to use a loop)
-	index = bits.TrailingZeros64(chess.BlackKing)
-	blackCanAttack |= KING_ATTACK[index] & blacksCanLandTo
-
-	return blackCanAttack
+	chess.Flip()
+	defer chess.Flip()
+	return FlipVertical(chess.GenerateWhiteAttacks())
 }
 
 // Check if the Black King is under attacked (is checked)
@@ -134,20 +50,10 @@ func (chess *Chess) IsBlackKingChecked() bool {
 
 // Calculate all Black King attackers bitboard, and also if there is at least one sliding piece attacker
 func (chess *Chess) CalculateBlackKingAttackers() (uint64, bool) {
-	var (
-		FILE_A, FILE_H = FILE_MASK[0], FILE_MASK[7]
-		kingIndex      = bits.TrailingZeros64(chess.BlackKing)
-	)
-
-	//Calculate attacker
-	pawnAttackers := (chess.BlackKing >> 7) & ^FILE_H & chess.WhitePawns
-	pawnAttackers |= (chess.BlackKing >> 9) & ^FILE_A & chess.WhitePawns
-	rookAttackers := HAndVMoves(kingIndex, chess) & chess.WhiteRooks
-	knightAttackers := KNIGHT_ATTACK[kingIndex] & chess.WhiteKnights
-	bishopAttackers := DAndAntiDMoves(kingIndex, chess) & chess.WhiteBishops
-	queenAttackers := (HAndVMoves(kingIndex, chess) | DAndAntiDMoves(kingIndex, chess)) & chess.WhiteQueens
-
-	return pawnAttackers | rookAttackers | knightAttackers | bishopAttackers | queenAttackers, rookAttackers != 0 || bishopAttackers != 0 || queenAttackers != 0
+	chess.Flip()
+	defer chess.Flip()
+	attackers, hasSPAttackers := chess.CalculateWhiteKingAttackers()
+	return FlipVertical(attackers), hasSPAttackers
 }
 
 /*
@@ -262,7 +168,7 @@ func (chess *Chess) BlackMoveGeneration() []string {
 				}
 
 				if direction == FILE && IsPieceAtIndex(bp, pinPieceIndex) {
-					pinMoves = append(pinMoves, CalculateBlackPawnPinMoves(pinAttackerIndex, pinPieceIndex, direction, empty)...)
+					pinMoves = append(pinMoves, CalculatePawnPinMoves(pinAttackerIndex, pinPieceIndex, direction, empty, BLACK)...)
 				}
 
 				ClearBitAcrossBoards(pinPieceIndex, &bp, &br, &bn, &bb, &bq)
@@ -293,7 +199,7 @@ func (chess *Chess) BlackMoveGeneration() []string {
 				if IsPieceAtIndex(bb, pinPieceIndex) || IsPieceAtIndex(bq, pinPieceIndex) {
 					pinMoves = append(pinMoves, CalculateSPPinMoves(min, max, pinAttackerIndex, pinPieceIndex, direction)...)
 				} else if IsPieceAtIndex(bp, pinPieceIndex) {
-					pinMoves = append(pinMoves, CalculateBlackPawnPinMoves(pinAttackerIndex, pinPieceIndex, direction, empty)...)
+					pinMoves = append(pinMoves, CalculatePawnPinMoves(pinAttackerIndex, pinPieceIndex, direction, empty, BLACK)...)
 				}
 				ClearBitAcrossBoards(pinPieceIndex, &bp, &br, &bn, &bb, &bq)
 			}

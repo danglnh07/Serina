@@ -79,7 +79,7 @@ func (chess *Chess) MakeMove(move string) {
 		destIndex    = FromAlgebraicToIndex(move[2:4])
 		captureIndex int
 		//Hash map for traversal
-		movedMap, capturedMap map[uint64]*uint64
+		movedMap map[uint64]*uint64
 	)
 
 	//We first check if the turn is correct
@@ -89,10 +89,10 @@ func (chess *Chess) MakeMove(move string) {
 	}
 
 	//Calculate capture index
-	if strings.HasSuffix(move, "EP") {
-		if chess.SideToMove {
+	if strings.HasSuffix(move, "EP") { //If this is en passant move
+		if chess.SideToMove { //If WHITE turn
 			captureIndex = destIndex - 8
-		} else {
+		} else { //If BLACK turn
 			captureIndex = destIndex + 8
 		}
 	} else {
@@ -109,14 +109,6 @@ func (chess *Chess) MakeMove(move string) {
 			chess.WhiteQueens:  &chess.WhiteQueens,
 			chess.WhiteKing:    &chess.WhiteKing,
 		}
-		//The King will never be captured, so we ignore them
-		capturedMap = map[uint64]*uint64{
-			chess.BlackPawns:   &chess.BlackPawns,
-			chess.BlackRooks:   &chess.BlackRooks,
-			chess.BlackKnights: &chess.BlackKnights,
-			chess.BlackBishops: &chess.BlackBishops,
-			chess.BlackQueens:  &chess.BlackQueens,
-		}
 	} else {
 		movedMap = map[uint64]*uint64{
 			chess.BlackPawns:   &chess.BlackPawns,
@@ -125,14 +117,6 @@ func (chess *Chess) MakeMove(move string) {
 			chess.BlackBishops: &chess.BlackBishops,
 			chess.BlackQueens:  &chess.BlackQueens,
 			chess.BlackKing:    &chess.BlackKing,
-		}
-		//The King will never be captured, so we ignore them
-		capturedMap = map[uint64]*uint64{
-			chess.WhitePawns:   &chess.WhitePawns,
-			chess.WhiteRooks:   &chess.WhiteRooks,
-			chess.WhiteKnights: &chess.WhiteKnights,
-			chess.WhiteBishops: &chess.WhiteBishops,
-			chess.WhiteQueens:  &chess.WhiteQueens,
 		}
 	}
 
@@ -176,11 +160,10 @@ func (chess *Chess) MakeMove(move string) {
 	}
 
 	//Remove capture piece
-	for key, val := range capturedMap {
-		if IsPieceAtIndex(key, captureIndex) {
-			ClearBit(captureIndex, val)
-			break
-		}
+	if chess.SideToMove {
+		ClearBitAcrossBoards(captureIndex, &chess.BlackPawns, &chess.BlackRooks, &chess.BlackKnights, &chess.BlackBishops, &chess.BlackQueens)
+	} else {
+		ClearBitAcrossBoards(captureIndex, &chess.WhitePawns, &chess.WhiteRooks, &chess.WhiteKnights, &chess.WhiteBishops, &chess.WhiteQueens)
 	}
 
 	//Re-calculate castling privilege

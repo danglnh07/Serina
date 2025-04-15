@@ -137,3 +137,14 @@ func WriteFile(str, path string) error {
 
 	return nil
 }
+
+func FlipVertical(bitboard uint64) uint64 {
+	return (bitboard << 56) | //Map from RANK 1 to RANK 8
+		((bitboard << 40) & RANK_MASK[6]) | //Map from RANK 2 to RANK 7
+		((bitboard << 24) & RANK_MASK[5]) | //Map from RANK 3 to RANK 6
+		((bitboard << 8) & RANK_MASK[4]) | //Map from RANK 4 to RANK 5
+		((bitboard >> 8) & RANK_MASK[3]) | //Map from RANK 5 to RANK 4
+		((bitboard >> 24) & RANK_MASK[2]) | //Map from RANK 6 to RANK 3
+		((bitboard >> 40) & RANK_MASK[1]) | //Map from RANK 7 to RANK 2
+		(bitboard >> 56) //Map from RANK 8 to RANK 1
+}

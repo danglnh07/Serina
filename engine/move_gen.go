@@ -58,20 +58,27 @@ func CalculateSPPinMoves(min, max, pseudoAttackerIndex, pinPieceIndex int, direc
 	return moves
 }
 
-// Get all white pawn pin piece moves for FILE, DIAGONAL and ANTI_DIAGONAL direction
-func CalculateWhitePawnPinMoves(pseudoAttackerIndex, pinPieceIndex int, direction Direction, empty uint64) []string {
+func CalculatePawnPinMoves(pseudoAttackerIndex, pinPieceIndex int, direction Direction, empty uint64, color Color) []string {
 	var (
-		moves     []string
-		move      = FromIndexToAlgebraic(pinPieceIndex)
-		pawnMoves uint64
-		attacker  uint64 = 0x1 << pseudoAttackerIndex
-		index     int
+		moves      []string
+		move       = FromIndexToAlgebraic(pinPieceIndex)
+		pawnMoves  uint64
+		attacker   uint64 = 0x1 << pseudoAttackerIndex
+		index      int
+		multiplier = 1                           //Default for WHITE
+		pawnConst  = (empty << 8) & RANK_MASK[3] //Default for WHITE
 	)
+
+	if color == BLACK {
+		multiplier = -1
+		pawnConst = (empty >> 8) & RANK_MASK[4]
+	}
 
 	//Handle FILE direction
 	if direction == FILE {
-		pawnMoves = (0x1 << (pinPieceIndex + 8)) & empty
-		pawnMoves |= (0x1 << (pinPieceIndex + 16)) & empty & (empty << 8) & RANK_MASK[3]
+		pawnMoves = (0x1 << (pinPieceIndex + multiplier*8)) & empty
+		pawnMoves |= (0x1 << (pinPieceIndex + multiplier*16)) & empty & pawnConst
+
 		for pawnMoves != 0 {
 			index = bits.TrailingZeros64(pawnMoves)
 			moves = append(moves, move+FromIndexToAlgebraic(index))
@@ -79,45 +86,12 @@ func CalculateWhitePawnPinMoves(pseudoAttackerIndex, pinPieceIndex int, directio
 		}
 	} else if direction == DIAGONAL || direction == ANTI_DIAGONAL {
 		//Logic for DIAGONAL and ANTI_DIAGONAL is the same, so we group them together
-		pawnMoves = (0x1 << (pinPieceIndex + int(direction))) & attacker
+		pawnMoves = (0x1 << (pinPieceIndex + multiplier*int(direction))) & attacker
 		if pawnMoves != 0 {
 			move += FromIndexToAlgebraic(bits.TrailingZeros64(pawnMoves))
 			if 56 <= pseudoAttackerIndex && pseudoAttackerIndex <= 63 {
 				moves = append(moves, []string{move + "Q", move + "R", move + "B", move + "N"}...)
-			} else {
-				moves = append(moves, move)
-			}
-		}
-	}
-
-	return moves
-}
-
-// Get all black pawn pin piece moves for FILE, DIAGONAL and ANTI_DIAGONAL direction
-func CalculateBlackPawnPinMoves(pseudoAttackerIndex, pinPieceIndex int, direction Direction, empty uint64) []string {
-	var (
-		moves     []string
-		move      = FromIndexToAlgebraic(pinPieceIndex)
-		pawnMoves uint64
-		attacker  uint64 = 0x1 << pseudoAttackerIndex
-		index     int
-	)
-
-	//Handle FILE direction
-	if direction == FILE {
-		pawnMoves = (0x1 << (pinPieceIndex - 8)) & empty
-		pawnMoves |= (0x1 << (pinPieceIndex - 16)) & empty & (empty >> 8) & RANK_MASK[4]
-		for pawnMoves != 0 {
-			index = bits.TrailingZeros64(pawnMoves)
-			moves = append(moves, move+FromIndexToAlgebraic(index))
-			ClearBit(index, &pawnMoves)
-		}
-	} else if direction == DIAGONAL || direction == ANTI_DIAGONAL {
-		//Logic for DIAGONAL and ANTI_DIAGONAL is the same, so we group them together
-		pawnMoves = (0x1 << (pinPieceIndex - int(direction))) & attacker
-		if pawnMoves != 0 {
-			move += FromIndexToAlgebraic(bits.TrailingZeros64(pawnMoves))
-			if 0 <= pseudoAttackerIndex && pseudoAttackerIndex <= 7 {
+			} else if 0 <= pseudoAttackerIndex && pseudoAttackerIndex <= 7 {
 				moves = append(moves, []string{move + "q", move + "r", move + "b", move + "n"}...)
 			} else {
 				moves = append(moves, move)
@@ -130,9 +104,7 @@ func CalculateBlackPawnPinMoves(pseudoAttackerIndex, pinPieceIndex int, directio
 
 // Move generation, which will decide based on the side to move and call the appropiate method
 func (chess *Chess) MoveGeneration() []string {
-	// fmt.Println(chess.sideToMove)
 	if chess.SideToMove {
-		// utility.PrintList(chess.WhiteMoveGeneration())
 		return chess.WhiteMoveGeneration()
 	}
 	return chess.BlackMoveGeneration()

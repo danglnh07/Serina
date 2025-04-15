@@ -263,7 +263,7 @@ func (chess *Chess) WhiteMoveGeneration() []string {
 				}
 
 				if direction == FILE && IsPieceAtIndex(wp, pinPieceIndex) {
-					pinMoves = append(pinMoves, CalculateWhitePawnPinMoves(pseudoAttackerIndex, pinPieceIndex, direction, empty)...)
+					pinMoves = append(pinMoves, CalculatePawnPinMoves(pseudoAttackerIndex, pinPieceIndex, direction, empty, WHITE)...)
 				}
 
 				ClearBitAcrossBoards(pinPieceIndex, &wp, &wr, &wn, &wb, &wq)
@@ -294,7 +294,7 @@ func (chess *Chess) WhiteMoveGeneration() []string {
 				if IsPieceAtIndex(wb, pinPieceIndex) || IsPieceAtIndex(wq, pinPieceIndex) {
 					pinMoves = append(pinMoves, CalculateSPPinMoves(min, max, pseudoAttackerIndex, pinPieceIndex, direction)...)
 				} else if IsPieceAtIndex(wp, pinPieceIndex) {
-					pinMoves = append(pinMoves, CalculateWhitePawnPinMoves(pseudoAttackerIndex, pinPieceIndex, direction, empty)...)
+					pinMoves = append(pinMoves, CalculatePawnPinMoves(pseudoAttackerIndex, pinPieceIndex, direction, empty, WHITE)...)
 				}
 				ClearBitAcrossBoards(pinPieceIndex, &wp, &wr, &wn, &wb, &wq)
 			}
