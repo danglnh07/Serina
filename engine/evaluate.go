@@ -91,7 +91,7 @@ func EvaluatePS(bitboard uint64, piece_square []int, side Color) int {
 		index = 63 - bits.TrailingZeros64(bitboard) //bitboard and normal array has reverse index
 		if side == BLACK {
 			//If this is BLACK, get the mirror value of the PST (flipping vertically)
-			res += piece_square[8*(7-index/8)+index%8]
+			res += piece_square[FlipIndexVertical(index)]
 		} else {
 			res += piece_square[index]
 		}
@@ -99,6 +99,71 @@ func EvaluatePS(bitboard uint64, piece_square []int, side Color) int {
 	}
 
 	return res
+}
+
+func (chess *Chess) CalculateBonus(side Color) int {
+	/*
+	 * Refer to the rule state in chessprograming wiki: https://www.chessprogramming.org/Material
+	 * All the bonus/penalty point can be tune further
+	 */
+	var bonus = 0
+
+	if side == WHITE {
+		//Bonus for pair bishop
+		if bits.OnesCount64(chess.WhiteBishops) >= 2 {
+			bonus += 66
+		}
+
+		//Penalty for knight pair
+		if bits.OnesCount64(chess.WhiteKnights) >= 2 {
+			bonus -= 64
+		}
+
+		//Penalty for rook pair
+		if bits.OnesCount64(chess.WhiteRooks) >= 2 {
+			bonus -= 100
+		}
+
+		//Bonus for pair queen (encourage promotion to queen)
+		if bits.OnesCount64(chess.WhiteQueens) >= 2 {
+			bonus -= 180
+		}
+
+		//Penalty for not having any pawn left (harder for checkmate in endgame)
+		if bits.OnesCount64(chess.WhitePawns) == 0 {
+			bonus -= 300
+		}
+
+		return bonus
+	}
+
+	//Black side
+	//Bonus for pair bishop
+	if bits.OnesCount64(chess.BlackBishops) >= 2 {
+		bonus += 66
+	}
+
+	//Penalty for knight pair
+	if bits.OnesCount64(chess.BlackKnights) >= 2 {
+		bonus -= 64
+	}
+
+	//Penalty for rook pair
+	if bits.OnesCount64(chess.BlackRooks) >= 2 {
+		bonus -= 100
+	}
+
+	//Bonus for pair queen (encourage promotion to queen)
+	if bits.OnesCount64(chess.BlackQueens) >= 2 {
+		bonus -= 180
+	}
+
+	//Penalty for not having any pawn left (harder for checkmate in endgame)
+	if bits.OnesCount64(chess.BlackPawns) == 0 {
+		bonus -= 300
+	}
+
+	return -bonus //For Black, more negative is more advantage
 }
 
 func (chess *Chess) Evaluate() int {
@@ -148,7 +213,5 @@ func (chess *Chess) Evaluate() int {
 	temp = chess.BlackKing
 	piece_square += EvaluatePS(temp, kingPS, BLACK)
 
-	return material + piece_square
-	// return material
-	// return piece_square
+	return material + piece_square + chess.CalculateBonus(WHITE) + chess.CalculateBonus(BLACK)
 }

@@ -148,3 +148,8 @@ func FlipVertical(bitboard uint64) uint64 {
 		((bitboard >> 40) & RANK_MASK[1]) | //Map from RANK 7 to RANK 2
 		(bitboard >> 56) //Map from RANK 8 to RANK 1
 }
+
+// Flip index of the chessboard's square vertically
+func FlipIndexVertical(index int) int {
+	return 8*(7-index/8) + index%8
+}

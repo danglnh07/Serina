@@ -165,6 +165,11 @@ func (chess *Chess) Flip() {
 	chess.WhiteBishops, chess.BlackBishops = FlipVertical(chess.BlackBishops), FlipVertical(chess.WhiteBishops)
 	chess.WhiteQueens, chess.BlackQueens = FlipVertical(chess.BlackQueens), FlipVertical(chess.WhiteQueens)
 	chess.WhiteKing, chess.BlackKing = FlipVertical(chess.BlackKing), FlipVertical(chess.WhiteKing)
+
+	//Flip the en passant target (if any)
+	if chess.EnPassantTarget != -1 {
+		chess.EnPassantTarget = FlipIndexVertical(chess.EnPassantTarget)
+	}
 }
 
 // Method to return a string array representation of the chessboard
