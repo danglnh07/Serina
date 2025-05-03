@@ -26,6 +26,3 @@ go.work.sum
 
 # ignore all txt file
 *.txt
-
-# ignore record json file
-record.json
