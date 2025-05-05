@@ -308,14 +308,5 @@ func (chess *Chess) FastPerft(depth int) (map[string]int, int) {
 	//Wait for all goroutine to done their job before continue
 	wg.Wait()
 
-	//Print the divide perft
-	str := ""
-	for move, count := range result {
-		str += fmt.Sprintf("%s: %d\n", move, count)
-	}
-	WriteFile(str, "perft_test.txt")
-	str += fmt.Sprintf("Node found: %d", total)
-	fmt.Println(str)
-
 	return result, total
 }
