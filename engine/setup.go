@@ -97,6 +97,13 @@ func (chess *Chess) FEN(fen string) {
 		chess.EnPassantTarget = FromAlgebraicToIndex(data[3])
 	}
 
+	//If the FEN string didn't provide the halfmove and fullmove value, we'll assign fallback value to them
+	if len(data) <= 4 {
+		chess.Halfmove = 0
+		chess.Fullmove = 1
+		return
+	}
+
 	//Register half move clock
 	var err error
 	chess.Halfmove, err = strconv.Atoi(data[4])
