@@ -76,11 +76,24 @@ func IsAtSameAntiDiagonal(index1 int, index2 int) bool {
 
 // Return the bitboard of all squares between min and max in a dicrection (excluding)
 func CalculateRayAttackLine(min, max int, direction Direction) uint64 {
-	var rayline uint64 = 0
-	for i := min + int(direction); i < max; i += int(direction) {
-		rayline += 0x1 << i
+	// var rayline uint64 = 0
+	// for i := min + int(direction); i < max; i += int(direction) {
+	// 	rayline += 0x1 << i
+	// }
+	// return rayline
+	// Return the bitboard of all squares between min and max in a dicrection (excluding)
+	var rayline uint64
+	switch direction {
+	case RANK:
+		rayline = RANK_MASK[min/8]
+	case FILE:
+		rayline = FILE_MASK[7-min%8]
+	case DIAGONAL:
+		rayline = DIAGONAL_MASK[14-(min/8+min%8)]
+	case ANTI_DIAGONAL:
+		rayline = ANTI_DIAGONAL_MASK[7-(min/8-min%8)]
 	}
-	return rayline
+	return rayline & ((0x1 << max) - 1) & ^((0x1 << (min + 1)) - 1)
 }
 
 // Method for printing an unsigned integer to 8x8 matrix of bits
