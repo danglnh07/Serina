@@ -2,13 +2,122 @@ package engine
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 )
 
+type Move struct {
+	Castling  int
+	FromBoard int
+	FromIndex int
+	ToBoard   int
+	ToIndex   int
+}
+
+func (move Move) String() string {
+	switch move.Castling {
+	case WHITE_KING_SIDE:
+		return "O-O"
+	case WHITE_QUEEN_SIDE:
+		return "O-O-O"
+	case BLACK_KING_SIDE:
+		return "o-o"
+	case BLACK_QUEEN_SIDE:
+		return "o-o-o"
+	default:
+		str := fmt.Sprintf("%s%s", FromIndexToAlgebraic(move.FromIndex), FromIndexToAlgebraic(move.ToIndex))
+		if move.ToBoard != move.FromBoard {
+			switch move.ToBoard {
+			case 1:
+				str += "R"
+			case 2:
+				str += "N"
+			case 3:
+				str += "B"
+			case 4:
+				str += "Q"
+			}
+		}
+
+		return str
+	}
+}
+
+func NewMove(chess *Chess, str string) Move {
+	switch str {
+	case "O-O":
+		return Move{Castling: WHITE_KING_SIDE}
+	case "O-O-O":
+		return Move{Castling: WHITE_QUEEN_SIDE}
+	case "o-o":
+		return Move{Castling: BLACK_KING_SIDE}
+	case "o-o-o":
+		return Move{Castling: BLACK_QUEEN_SIDE}
+	default:
+		move := Move{Castling: 0}
+		move.FromIndex = FromAlgebraicToIndex(str[:2])
+		move.ToIndex = FromAlgebraicToIndex(str[2:4])
+
+		switch {
+		case IsPieceAtIndex(chess.Boards[WHITE_PAWN], move.FromIndex):
+			move.FromBoard = WHITE_PAWN
+			if len(str) == 5 {
+				switch str[4] {
+				case 'R':
+					move.ToBoard = WHITE_ROOK
+				case 'N':
+					move.ToBoard = WHITE_KNIGHT
+				case 'B':
+					move.ToBoard = WHITE_BISHOP
+				case 'Q':
+					move.ToBoard = WHITE_QUEEN
+				}
+			} else {
+				move.ToBoard = WHITE_PAWN
+			}
+		case IsPieceAtIndex(chess.Boards[BLACK_PAWN], move.FromIndex):
+			move.FromBoard = BLACK_PAWN
+			if len(str) == 5 {
+				switch str[4] {
+				case 'r':
+					move.ToBoard = BLACK_ROOK
+				case 'n':
+					move.ToBoard = BLACK_KNIGHT
+				case 'b':
+					move.ToBoard = BLACK_BISHOP
+				case 'q':
+					move.ToBoard = BLACK_QUEEN
+				}
+			} else {
+				move.ToBoard = BLACK_PAWN
+			}
+		case IsPieceAtIndex(chess.Boards[WHITE_ROOK], move.FromIndex):
+			move.FromBoard, move.ToBoard = WHITE_ROOK, WHITE_ROOK
+		case IsPieceAtIndex(chess.Boards[WHITE_KNIGHT], move.FromIndex):
+			move.FromBoard, move.ToBoard = WHITE_KNIGHT, WHITE_KNIGHT
+		case IsPieceAtIndex(chess.Boards[WHITE_BISHOP], move.FromIndex):
+			move.FromBoard, move.ToBoard = WHITE_BISHOP, WHITE_BISHOP
+		case IsPieceAtIndex(chess.Boards[WHITE_QUEEN], move.FromIndex):
+			move.FromBoard, move.ToBoard = WHITE_QUEEN, WHITE_QUEEN
+		case IsPieceAtIndex(chess.Boards[WHITE_KING], move.FromIndex):
+			move.FromBoard, move.ToBoard = WHITE_KING, WHITE_KING
+		case IsPieceAtIndex(chess.Boards[BLACK_ROOK], move.FromIndex):
+			move.FromBoard, move.ToBoard = BLACK_ROOK, BLACK_ROOK
+		case IsPieceAtIndex(chess.Boards[BLACK_KNIGHT], move.FromIndex):
+			move.FromBoard, move.ToBoard = BLACK_KNIGHT, BLACK_KNIGHT
+		case IsPieceAtIndex(chess.Boards[BLACK_BISHOP], move.FromIndex):
+			move.FromBoard, move.ToBoard = BLACK_BISHOP, BLACK_BISHOP
+		case IsPieceAtIndex(chess.Boards[BLACK_QUEEN], move.FromIndex):
+			move.FromBoard, move.ToBoard = BLACK_QUEEN, BLACK_QUEEN
+		case IsPieceAtIndex(chess.Boards[BLACK_KING], move.FromIndex):
+			move.FromBoard, move.ToBoard = BLACK_KING, BLACK_KING
+		}
+
+		return move
+	}
+}
+
 // Mapping for castling (to avoid if else)
 var (
-
 	/*
 	 * Mapping for the castling operation. Each element in the array are:
 	 * Initial rook position
@@ -17,199 +126,115 @@ var (
 	 * New king position
 	 * Castling turn off bitmask
 	 */
-	csVariablesMapping = map[CastlingSide][5]int{
+	csMapping = map[int][5]int{
 		WHITE_KING_SIDE:  {0, 2, 3, 1, 3},
 		WHITE_QUEEN_SIDE: {7, 4, 3, 5, 3},
 		BLACK_KING_SIDE:  {56, 58, 59, 57, 12},
 		BLACK_QUEEN_SIDE: {63, 60, 59, 61, 12},
 	}
-
-	//Mapping from string representation to CastlingSide type
-	csMoveMapping = map[string]CastlingSide{
-		"O-O":   WHITE_KING_SIDE,
-		"O-O-O": WHITE_QUEEN_SIDE,
-		"o-o":   BLACK_KING_SIDE,
-		"o-o-o": BLACK_QUEEN_SIDE,
-	}
 )
 
 // Method to perform castling
-func (chess *Chess) Castling(castlingType CastlingSide) {
+func (chess *Chess) Castling(cs int) {
 	//Set en passant target, full move and half move
 	chess.EnPassantTarget = -1
 	chess.Halfmove++
 
-	if castlingType == WHITE_KING_SIDE || castlingType == WHITE_QUEEN_SIDE {
-		ClearBit(csVariablesMapping[castlingType][0], &chess.WhiteRooks)
-		SetBit(csVariablesMapping[castlingType][1], &chess.WhiteRooks)
-		ClearBit(csVariablesMapping[castlingType][2], &chess.WhiteKing)
-		SetBit(csVariablesMapping[castlingType][3], &chess.WhiteKing)
+	if cs == WHITE_KING_SIDE || cs == WHITE_QUEEN_SIDE {
+		ClearBit(csMapping[cs][0], &chess.Boards[WHITE_ROOK])
+		SetBit(csMapping[cs][1], &chess.Boards[WHITE_ROOK])
+		ClearBit(csMapping[cs][2], &chess.Boards[WHITE_KING])
+		SetBit(csMapping[cs][3], &chess.Boards[WHITE_KING])
 	} else {
-		ClearBit(csVariablesMapping[castlingType][0], &chess.BlackRooks)
-		SetBit(csVariablesMapping[castlingType][1], &chess.BlackRooks)
-		ClearBit(csVariablesMapping[castlingType][2], &chess.BlackKing)
-		SetBit(csVariablesMapping[castlingType][3], &chess.BlackKing)
+		ClearBit(csMapping[cs][0], &chess.Boards[BLACK_ROOK])
+		SetBit(csMapping[cs][1], &chess.Boards[BLACK_ROOK])
+		ClearBit(csMapping[cs][2], &chess.Boards[BLACK_KING])
+		SetBit(csMapping[cs][3], &chess.Boards[BLACK_KING])
 
 		//Only Black turn that full move can increase
 		chess.Fullmove++
 	}
 
-	chess.SideToMove = !chess.SideToMove
-	chess.CastlingPrivilege &= csVariablesMapping[castlingType][4]
+	chess.SideToMove = WHITE + BLACK - chess.SideToMove
+	chess.CastlingPrivilege &= csMapping[cs][4]
 }
 
 // Makemove method. Here, we assume that the move is a valid move: correct move syntax, correct turn and valid move
-func (chess *Chess) MakeMove(move string) {
-	//If move is castling, delegate it to castling funtion
-	if csType, ok := csMoveMapping[move]; ok {
-		chess.Castling(csType)
+func (chess *Chess) MakeMove(move Move) {
+	if move.Castling != 0 {
+		chess.Castling(move.Castling)
 		return
 	}
 
-	//If other moves, we calculate sourceIndex, destIndex and captureIndex
-	var (
-		sourceIndex  = FromAlgebraicToIndex(move[:2])
-		destIndex    = FromAlgebraicToIndex(move[2:4])
-		captureIndex int
-	)
+	//Move the piece
+	ClearBit(move.FromIndex, &chess.Boards[move.FromBoard])
 
-	//Reset en passant target
-	chess.EnPassantTarget = -1
+	//Place the piece down
+	SetBit(move.ToIndex, &chess.Boards[move.ToBoard])
 
-	//Moving the piece
-	switch move[len(move)-1] {
-	case 'R':
-		SetBit(destIndex, &chess.WhiteRooks)
-	case 'N':
-		SetBit(destIndex, &chess.WhiteKnights)
-	case 'B':
-		SetBit(destIndex, &chess.WhiteBishops)
-	case 'Q':
-		SetBit(destIndex, &chess.WhiteQueens)
-	case 'r':
-		SetBit(destIndex, &chess.BlackRooks)
-	case 'n':
-		SetBit(destIndex, &chess.BlackKnights)
-	case 'b':
-		SetBit(destIndex, &chess.BlackBishops)
-	case 'q':
-		SetBit(destIndex, &chess.BlackQueens)
-	default:
-		//Find the bitboard of the piece that moving
-		switch {
-		case IsPieceAtIndex(chess.WhitePawns, sourceIndex):
-			//If this is pawn double push, re-calculate en passant target
-			if Abs(destIndex-sourceIndex) == 16 {
-				chess.EnPassantTarget = (destIndex + sourceIndex) / 2
+	//Calculate capture index and remove the capture piece
+	captureIndex := move.ToIndex
+	if chess.SideToMove == WHITE {
+		if move.FromBoard == WHITE_PAWN && move.ToIndex == chess.EnPassantTarget {
+			captureIndex = chess.EnPassantTarget - 8
+			ClearBit(captureIndex, &chess.Boards[BLACK_PAWN])
+		} else {
+			for i := BLACK_PAWN; i < BLACK_KING; i++ { //King capturing normally not happen, so we ignore it here
+				ClearBit(captureIndex, &chess.Boards[i])
 			}
-			//Place the pawn at destIndex
-			SetBit(destIndex, &chess.WhitePawns)
-			//Reset halfmove counter to 0 (50 moves rule) when a pawn moving
-			chess.Halfmove = 0
-		case IsPieceAtIndex(chess.WhiteRooks, sourceIndex):
-			SetBit(destIndex, &chess.WhiteRooks)
-		case IsPieceAtIndex(chess.WhiteKnights, sourceIndex):
-			SetBit(destIndex, &chess.WhiteKnights)
-		case IsPieceAtIndex(chess.WhiteBishops, sourceIndex):
-			SetBit(destIndex, &chess.WhiteBishops)
-		case IsPieceAtIndex(chess.WhiteQueens, sourceIndex):
-			SetBit(destIndex, &chess.WhiteQueens)
-		case IsPieceAtIndex(chess.WhiteKing, sourceIndex):
-			SetBit(destIndex, &chess.WhiteKing)
-		case IsPieceAtIndex(chess.BlackPawns, sourceIndex):
-			//If this is pawn double push, re-calculate en passant target
-			if Abs(destIndex-sourceIndex) == 16 {
-				chess.EnPassantTarget = (destIndex + sourceIndex) / 2
+		}
+	} else {
+		if move.FromBoard == BLACK_PAWN && move.ToIndex == chess.EnPassantTarget {
+			captureIndex = chess.EnPassantTarget + 8
+			ClearBit(captureIndex, &chess.Boards[WHITE_PAWN])
+		} else {
+			for i := WHITE_PAWN; i < WHITE_KING; i++ {
+				ClearBit(captureIndex, &chess.Boards[i])
 			}
-			//Place the pawn at destIndex
-			SetBit(destIndex, &chess.BlackPawns)
-			//Reset halfmove counter to 0 (50 moves rule) when a pawn moving
-			chess.Halfmove = 0
-		case IsPieceAtIndex(chess.BlackRooks, sourceIndex):
-			SetBit(destIndex, &chess.BlackRooks)
-		case IsPieceAtIndex(chess.BlackKnights, sourceIndex):
-			SetBit(destIndex, &chess.BlackKnights)
-		case IsPieceAtIndex(chess.BlackBishops, sourceIndex):
-			SetBit(destIndex, &chess.BlackBishops)
-		case IsPieceAtIndex(chess.BlackQueens, sourceIndex):
-			SetBit(destIndex, &chess.BlackQueens)
-		case IsPieceAtIndex(chess.BlackKing, sourceIndex):
-			SetBit(destIndex, &chess.BlackKing)
 		}
 	}
 
-	//Move the piece
-	if chess.SideToMove {
-		//Remove the piece stay at sourceIndex
-		ClearBitAcrossBoards(sourceIndex, &chess.WhitePawns, &chess.WhiteRooks, &chess.WhiteKnights,
-			&chess.WhiteBishops, &chess.WhiteQueens, &chess.WhiteKing)
-
-		//Reset the halfmove counter to 0 (50 moves rule) if there is a capture
-		if IsPieceAtIndex(chess.GenerateAllBlacks(), captureIndex) {
-			chess.Halfmove = 0
-		}
-
-		//Calculate capture index
-		if strings.HasSuffix(move, "EP") { //If this is en passant move
-			captureIndex = destIndex - 8
-		} else {
-			captureIndex = destIndex
-		}
-
-		//Remove capture piece
-		ClearBitAcrossBoards(captureIndex, &chess.BlackPawns, &chess.BlackRooks, &chess.BlackKnights,
-			&chess.BlackBishops, &chess.BlackQueens)
+	//Re-calculate game state
+	if (move.FromBoard == WHITE_PAWN || move.FromBoard == BLACK_PAWN) && (Abs(move.ToIndex-move.FromIndex)) == 16 {
+		chess.EnPassantTarget = (move.ToIndex + move.FromIndex) / 2
 	} else {
-		//Remove the piece stay at sourceIndex
-		ClearBitAcrossBoards(sourceIndex, &chess.BlackPawns, &chess.BlackRooks, &chess.BlackKnights,
-			&chess.BlackBishops, &chess.BlackQueens, &chess.BlackKing)
+		chess.EnPassantTarget = -1
+	}
 
-		//Reset the halfmove counter to 0 (50 moves rule) if there is a capture
-		if IsPieceAtIndex(chess.GenerateAllWhites(), captureIndex) {
-			chess.Halfmove = 0
+	if !IsPieceAtIndex(chess.Boards[WHITE_KING], 3) {
+		chess.CastlingPrivilege &= 3
+	} else {
+		if !IsPieceAtIndex(chess.Boards[WHITE_ROOK], 0) {
+			chess.CastlingPrivilege &= 7
 		}
 
-		//Calculate capture index
-		if strings.HasSuffix(move, "EP") { //If this is en passant move
-			captureIndex = destIndex + 8
-		} else {
-			captureIndex = destIndex
+		if !IsPieceAtIndex(chess.Boards[WHITE_ROOK], 7) {
+			chess.CastlingPrivilege &= 11
+		}
+	}
+
+	if !IsPieceAtIndex(chess.Boards[BLACK_KING], 59) {
+		chess.CastlingPrivilege &= 12
+	} else {
+		if !IsPieceAtIndex(chess.Boards[BLACK_ROOK], 56) {
+			chess.CastlingPrivilege &= 13
 		}
 
-		//Remove capture piece
-		ClearBitAcrossBoards(captureIndex, &chess.WhitePawns, &chess.WhiteRooks, &chess.WhiteKnights,
-			&chess.WhiteBishops, &chess.WhiteQueens)
+		if !IsPieceAtIndex(chess.Boards[BLACK_ROOK], 63) {
+			chess.CastlingPrivilege &= 14
+		}
+	}
 
-		//Update fullmove (can only increase in Black turn)
+	chess.SideToMove = WHITE + BLACK - chess.SideToMove
+	if move.FromBoard == WHITE_PAWN || move.FromBoard == BLACK_PAWN || IsPieceAtIndex(chess.GenerateAllBlacks(), captureIndex) {
+		chess.Halfmove = 0
+	} else {
+		chess.Halfmove++
+	}
+
+	if chess.SideToMove == BLACK {
 		chess.Fullmove++
 	}
-
-	//Re-calculate castling privilege
-	if !IsPieceAtIndex(chess.WhiteKing, 3) {
-		chess.CastlingPrivilege &= 3
-	}
-
-	if !IsPieceAtIndex(chess.BlackKing, 59) {
-		chess.CastlingPrivilege &= 12
-	}
-
-	if !IsPieceAtIndex(chess.WhiteRooks, 0) {
-		chess.CastlingPrivilege &= 7
-	}
-
-	if !IsPieceAtIndex(chess.WhiteRooks, 7) {
-		chess.CastlingPrivilege &= 11
-	}
-
-	if !IsPieceAtIndex(chess.BlackRooks, 56) {
-		chess.CastlingPrivilege &= 13
-	}
-
-	if !IsPieceAtIndex(chess.BlackRooks, 63) {
-		chess.CastlingPrivilege &= 14
-	}
-
-	chess.SideToMove = !chess.SideToMove
 }
 
 // Perft method: return all move found in the n-depthed search tree. We use copy here instead of Make/Unmake. This is a single threaded version
@@ -249,7 +274,7 @@ func (chess *Chess) DividePerft(depth int) (map[string]int, int) {
 		clone.MakeMove(move)
 		count := clone.Perft(depth - 1)
 		total += count
-		results[move] = count
+		results[move.String()] = count
 	}
 
 	//Turn the map to string for printing out
@@ -257,9 +282,6 @@ func (chess *Chess) DividePerft(depth int) (map[string]int, int) {
 	for move, count := range results {
 		str += fmt.Sprintf("%s: %d\n", move, count)
 	}
-	WriteFile(str, "perft_test.txt") //Write to perft_test.txt file
-	str += fmt.Sprintf("Node found: %d\n", total)
-	fmt.Println(str)
 
 	return results, total
 }
@@ -286,20 +308,20 @@ func (chess *Chess) FastPerft(depth int) (map[string]int, int) {
 		wg.Add(1)
 
 		//Spawn goroutine for only the direct child of the root
-		go func(moveStr string) {
+		go func(move Move) {
 			//Signify job done to decrease the wait group
 			defer wg.Done()
 
 			//Clone and make move
 			clone := chess.Clone()
-			clone.MakeMove(moveStr)
+			clone.MakeMove(move)
 
 			//Run perft for the smaller tree
 			count := clone.Perft(depth - 1)
 
 			//Add move and node found to the result map. We use mutex to avoid race condition since result is a share resource
 			mutex.Lock()
-			result[move] = count
+			result[move.String()] = count
 			total += count
 			mutex.Unlock()
 		}(move) //Pass move as a parameter to avoid closure issues

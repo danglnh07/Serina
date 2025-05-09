@@ -54,77 +54,35 @@ var (
 	}
 )
 
-// Chess struct
-type Chess struct {
-	WhitePawns        uint64
-	WhiteRooks        uint64
-	WhiteKnights      uint64
-	WhiteBishops      uint64
-	WhiteQueens       uint64
-	WhiteKing         uint64
-	BlackPawns        uint64
-	BlackRooks        uint64
-	BlackKnights      uint64
-	BlackBishops      uint64
-	BlackQueens       uint64
-	BlackKing         uint64
-	SideToMove        bool // True if White turn, false if Black turn
-	EnPassantTarget   int  // Range from 0 to 63
-	CastlingPrivilege int  // Use 4 bit integer to represent: KQkq (exactly in this order)
-	Halfmove          int
-	Fullmove          int
-}
-
-// Factory method to create new chess instance
-func NewChess() *Chess {
-	return &Chess{}
-}
-
-/*---Define type Direction*/
-
-// Direction in a chess: RANK (1), FILE (8), DIAGONAL (7), ANTI_DIAGONAL (9)
-type Direction int
-
-// Method to validate value for Direction
-func (d Direction) IsValid() bool {
-	return d == RANK || d == FILE || d == DIAGONAL || d == ANTI_DIAGONAL
-}
-
 const (
-	RANK          Direction = 1
-	FILE          Direction = 8
-	DIAGONAL      Direction = 7
-	ANTI_DIAGONAL Direction = 9
+	RANK          = 1
+	FILE          = 8
+	DIAGONAL      = 7
+	ANTI_DIAGONAL = 9
+)
+const (
+	WHITE = 8
+	BLACK = 16
 )
 
-/*---Define type Color*/
-
-// Color in chess: WHITE (8) and BLACK (16) (the value is not realy necessary though)
-type Color int
-
-// Method to validate value for Color
-func (c Color) IsValid() bool {
-	return c == BLACK || c == WHITE
-}
-
 const (
-	WHITE Color = 8
-	BLACK Color = 16
+	WHITE_KING_SIDE  = 8
+	WHITE_QUEEN_SIDE = 4
+	BLACK_KING_SIDE  = 2
+	BLACK_QUEEN_SIDE = 1
 )
 
-/*---Define type Castling side*/
-
-// Castling side in chess: WHITE_KING_SIDE (8), WHITE_QUEEN_SIDE (4), BLACK_KING_SIDE(2), BLACK_QUEEN_SIDE (1)
-type CastlingSide int
-
-// Method to validate value for Castling side
-func (cs CastlingSide) IsValid() bool {
-	return cs == WHITE_KING_SIDE || cs == WHITE_QUEEN_SIDE || cs == BLACK_KING_SIDE || cs == BLACK_QUEEN_SIDE
-}
-
 const (
-	WHITE_KING_SIDE  CastlingSide = 8
-	WHITE_QUEEN_SIDE CastlingSide = 4
-	BLACK_KING_SIDE  CastlingSide = 2
-	BLACK_QUEEN_SIDE CastlingSide = 1
+	WHITE_PAWN = iota
+	WHITE_ROOK
+	WHITE_KNIGHT
+	WHITE_BISHOP
+	WHITE_QUEEN
+	WHITE_KING
+	BLACK_PAWN
+	BLACK_ROOK
+	BLACK_KNIGHT
+	BLACK_BISHOP
+	BLACK_QUEEN
+	BLACK_KING
 )
