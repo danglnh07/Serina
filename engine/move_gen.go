@@ -147,7 +147,11 @@ func (chess *Chess) IsWhiteKingChecked() bool {
 	chess.Flip()
 	blackAttacks := FlipVertical(chess.GenerateWhiteAttacks())
 	chess.Flip()
-	return chess.Boards[5]&blackAttacks != 0
+	return chess.Boards[WHITE_KING]&blackAttacks != 0
+}
+
+func (chess *Chess) IsBlackKingChecked() bool {
+	return chess.Boards[BLACK_KING]&chess.GenerateWhiteAttacks() != 0
 }
 
 func (chess *Chess) CalculateWhiteKingAttackers() (uint64, bool) {
