@@ -14,6 +14,11 @@ type Move struct {
 }
 
 func (move Move) String() string {
+	//Empty move/invalid move
+	if move.ToIndex == move.FromIndex {
+		return ""
+	}
+
 	switch move.Castling {
 	case WHITE_KING_SIDE:
 		return "O-O"
