@@ -14,32 +14,36 @@ type Move struct {
 }
 
 func (move Move) String() string {
-	//Empty move/invalid move
-	if move.ToIndex == move.FromIndex {
-		return ""
-	}
-
 	switch move.Castling {
 	case WHITE_KING_SIDE:
-		return "O-O"
+		return "e1g1"
 	case WHITE_QUEEN_SIDE:
-		return "O-O-O"
+		return "e1c1"
 	case BLACK_KING_SIDE:
-		return "o-o"
+		return "e8g8"
 	case BLACK_QUEEN_SIDE:
-		return "o-o-o"
+		return "e8c8"
 	default:
 		str := fmt.Sprintf("%s%s", FromIndexToAlgebraic(move.FromIndex), FromIndexToAlgebraic(move.ToIndex))
 		if move.ToBoard != move.FromBoard {
 			switch move.ToBoard {
 			case 1:
-				str += "R"
+				fallthrough
+			case 7:
+				str += "r"
 			case 2:
-				str += "N"
+				fallthrough
+			case 8:
+				str += "n"
 			case 3:
-				str += "B"
+				fallthrough
+			case 9:
+				str += "b"
 			case 4:
-				str += "Q"
+				fallthrough
+			case 10:
+				str += "q"
+
 			}
 		}
 

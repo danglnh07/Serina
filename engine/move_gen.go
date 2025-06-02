@@ -4,7 +4,7 @@ import (
 	"math/bits"
 )
 
-func HAndVMoves(index int, chess *Chess) uint64 {
+func (chess *Chess) HAndVMoves(index int) uint64 {
 	var (
 		r                              uint64 = 0x1 << index
 		o                              uint64 = chess.GenerateAllWhites() | chess.GenerateAllBlacks()
@@ -17,7 +17,7 @@ func HAndVMoves(index int, chess *Chess) uint64 {
 	return horizontal | vertical
 }
 
-func DAndAntiDMoves(index int, chess *Chess) uint64 {
+func (chess *Chess) DAndAntiDMoves(index int) uint64 {
 	var (
 		r                                  uint64 = 0x1 << index
 		o                                  uint64 = chess.GenerateAllWhites() | chess.GenerateAllBlacks()
@@ -66,7 +66,7 @@ func (chess *Chess) GenerateWhiteKingInDanger() uint64 {
 	temp = chess.Boards[BLACK_ROOK] | chess.Boards[BLACK_QUEEN]
 	for temp != 0 {
 		index = bits.TrailingZeros64(temp)
-		whiteInDanger |= HAndVMoves(index, chess) & blacks_empty_whiteKing
+		whiteInDanger |= chess.HAndVMoves(index) & blacks_empty_whiteKing
 		ClearBit(index, &temp)
 	}
 
@@ -82,7 +82,7 @@ func (chess *Chess) GenerateWhiteKingInDanger() uint64 {
 	temp = chess.Boards[BLACK_BISHOP] | chess.Boards[BLACK_QUEEN]
 	for temp != 0 {
 		index = bits.TrailingZeros64(temp)
-		whiteInDanger |= DAndAntiDMoves(index, chess) & blacks_empty_whiteKing
+		whiteInDanger |= chess.DAndAntiDMoves(index) & blacks_empty_whiteKing
 		ClearBit(index, &temp)
 	}
 
@@ -115,7 +115,7 @@ func (chess *Chess) GenerateWhiteAttacks() uint64 {
 	temp = chess.Boards[WHITE_ROOK] | chess.Boards[WHITE_QUEEN]
 	for temp != 0 {
 		index = bits.TrailingZeros64(temp)
-		whiteCanAttack |= HAndVMoves(index, chess) & whitesCanLandTo
+		whiteCanAttack |= chess.HAndVMoves(index) & whitesCanLandTo
 		ClearBit(index, &temp)
 	}
 
@@ -131,7 +131,7 @@ func (chess *Chess) GenerateWhiteAttacks() uint64 {
 	temp = chess.Boards[WHITE_BISHOP] | chess.Boards[WHITE_QUEEN]
 	for temp != 0 {
 		index = bits.TrailingZeros64(temp)
-		whiteCanAttack |= DAndAntiDMoves(index, chess) & whitesCanLandTo
+		whiteCanAttack |= chess.DAndAntiDMoves(index) & whitesCanLandTo
 		ClearBit(index, &temp)
 	}
 
@@ -163,45 +163,33 @@ func (chess *Chess) CalculateWhiteKingAttackers() (uint64, bool) {
 	//Calculate attacker
 	pawnAttackers := (chess.Boards[WHITE_KING] << 7) & ^FILE_A & chess.Boards[BLACK_PAWN]
 	pawnAttackers |= (chess.Boards[WHITE_KING] << 9) & ^FILE_H & chess.Boards[BLACK_PAWN]
-	rookAttackers := HAndVMoves(kingIndex, chess) & chess.Boards[BLACK_ROOK]
+	rookAttackers := chess.HAndVMoves(kingIndex) & chess.Boards[BLACK_ROOK]
 	knightAttackers := KNIGHT_ATTACK[kingIndex] & chess.Boards[BLACK_KNIGHT]
-	bishopAttackers := DAndAntiDMoves(kingIndex, chess) & chess.Boards[BLACK_BISHOP]
-	queenAttackers := (HAndVMoves(kingIndex, chess) | DAndAntiDMoves(kingIndex, chess)) & chess.Boards[BLACK_QUEEN]
+	bishopAttackers := chess.DAndAntiDMoves(kingIndex) & chess.Boards[BLACK_BISHOP]
+	queenAttackers := (chess.HAndVMoves(kingIndex) | chess.DAndAntiDMoves(kingIndex)) & chess.Boards[BLACK_QUEEN]
 
 	return pawnAttackers | rookAttackers | knightAttackers | bishopAttackers | queenAttackers,
 		rookAttackers != 0 || bishopAttackers != 0 || queenAttackers != 0
 }
 
-func (chess *Chess) WhiteMoveGeneration() []Move {
-	//Variables declaration
+func (chess *Chess) WhiteKingMoves() []Move {
+	//Variable declaration
 	var (
-		moves     []Move
-		move      Move = Move{Castling: 0}
-		kingIndex      = bits.TrailingZeros64(chess.Boards[WHITE_KING])
-
-		//Temporary bitboard (since pin pieces can only moving along the line, we remove them from the bitboard)
-		wp = chess.Boards[WHITE_PAWN]
-		wr = chess.Boards[WHITE_ROOK]
-		wn = chess.Boards[WHITE_KNIGHT]
-		wb = chess.Boards[WHITE_BISHOP]
-		wq = chess.Boards[WHITE_QUEEN]
-
-		//All whites, blacks, empty bitboard
-		whites, blacks = chess.GenerateAllWhites(), chess.GenerateAllBlacks()
-		empty          = ^(whites | blacks)
-
-		//Temporary index used for looping through bitboard and direction temporary variable
-		index, direction int
-
-		//RANK, FILE constant
-		RANK_2, RANK_4, FILE_A, FILE_H = RANK_MASK[1], RANK_MASK[3], FILE_MASK[0], FILE_MASK[7]
+		kingIndex = bits.TrailingZeros64(chess.Boards[WHITE_KING])
+		kingMove  = KING_ATTACK[kingIndex] & ^chess.GenerateWhiteKingInDanger()
+		blacks    = chess.GenerateAllBlacks()
+		empty     = ^(chess.GenerateAllWhites() | blacks)
+		move      = Move{
+			FromBoard: WHITE_KING,
+			FromIndex: kingIndex,
+			ToBoard:   WHITE_KING,
+		}
+		moves []Move
+		index int
 	)
 
-	//Calculate King movement/evasion
-	kingMove := ^chess.GenerateWhiteKingInDanger() & KING_ATTACK[kingIndex] & ^whites // = KING_ATTACK & !(kingInDanger | whites)
-	move.FromBoard = WHITE_KING
-	move.FromIndex = kingIndex
-	move.ToBoard = WHITE_KING
+	//Calculate moves
+	kingMove &= (empty | blacks)
 	for kingMove != 0 {
 		index = bits.TrailingZeros64(kingMove)
 		move.ToIndex = index
@@ -209,33 +197,42 @@ func (chess *Chess) WhiteMoveGeneration() []Move {
 		ClearBit(index, &kingMove)
 	}
 
-	//Get King's attackers
-	attackers, hasSPAttacker := chess.CalculateWhiteKingAttackers()
-	//If this is double check, or there is only the King left, then we stop here
-	if bits.OnesCount64(attackers) > 1 || wp|wr|wn|wb|wq == 0 {
-		return moves
-	}
+	return moves
+}
 
-	//Handling en passant
+func (chess *Chess) EnPassantMoves() []Move {
+	//Variables declaration
+	var (
+		FILE_A, FILE_H = FILE_MASK[0], FILE_MASK[7]
+		move           = Move{
+			FromBoard: WHITE_PAWN,
+			ToBoard:   WHITE_PAWN,
+			ToIndex:   chess.EnPassantTarget,
+		}
+		moves []Move
+		index int
+	)
+
+	//Perform en passant move and check if the King is still vulnerable
 	if 40 <= chess.EnPassantTarget && chess.EnPassantTarget <= 47 {
+		//Record the old values of Whites and Black pawns
 		wpTemp, bpTemp := chess.Boards[WHITE_PAWN], chess.Boards[BLACK_PAWN]
-		epMove := ((0x1 << chess.EnPassantTarget) >> 9) & wp & ^FILE_A
-		epMove |= ((0x1 << chess.EnPassantTarget) >> 7) & wp & ^FILE_H
+
+		//Check if there're White pawns at EnPassantTarget - 9 or EnPassantTarget - 7
+		epMove := ((0x1 << chess.EnPassantTarget) >> 9) & chess.Boards[WHITE_PAWN] & ^FILE_A
+		epMove |= ((0x1 << chess.EnPassantTarget) >> 7) & chess.Boards[WHITE_PAWN] & ^FILE_H
 
 		//Loop though all ep move found
 		for epMove != 0 {
 			//Perform the en passant move
 			index = bits.TrailingZeros64(epMove)
-			ClearBit(index, &chess.Boards[WHITE_PAWN])
-			SetBit(chess.EnPassantTarget, &chess.Boards[WHITE_PAWN])
-			ClearBit(chess.EnPassantTarget-8, &chess.Boards[BLACK_PAWN])
+			ClearBit(index, &chess.Boards[WHITE_PAWN])                   //Move the White pawn from old position
+			SetBit(chess.EnPassantTarget, &chess.Boards[WHITE_PAWN])     //Place the White pawn to new position
+			ClearBit(chess.EnPassantTarget-8, &chess.Boards[BLACK_PAWN]) //Remove the Black pawn
 
 			//If the en passant move not lead to a check, add them to the list
 			if !chess.IsWhiteKingChecked() {
-				move.FromBoard = WHITE_PAWN
 				move.FromIndex = index
-				move.ToBoard = WHITE_PAWN
-				move.ToIndex = chess.EnPassantTarget
 				moves = append(moves, move)
 			}
 
@@ -248,358 +245,323 @@ func (chess *Chess) WhiteMoveGeneration() []Move {
 		}
 	}
 
-	//Calculate pin pieces' moves (whether it's single check or no check, we still need to remove the pin pieces beforehand)
+	return moves
+}
+
+func (chess *Chess) PinSPMoves(movePiece, capturePiece, pseudoAttackerIndex, pinPieceIndex int, rayline uint64) []Move {
+	//Variables declaration
 	var (
-		temp, rayline                                uint64
-		min, max, pseudoAttackerIndex, pinPieceIndex int
-		pinMoves                                     []Move
+		move = Move{
+			FromBoard: movePiece,
+			FromIndex: pinPieceIndex,
+			ToBoard:   movePiece,
+		}
+		moves []Move
+		index int
 	)
 
-	temp = chess.Boards[BLACK_ROOK] | chess.Boards[BLACK_QUEEN]
-	for temp != 0 {
-		pseudoAttackerIndex = bits.TrailingZeros64(temp)
-		min = Min(kingIndex, pseudoAttackerIndex)
-		max = Max(kingIndex, pseudoAttackerIndex)
+	//Calculate capture move
+	move.ToIndex = pseudoAttackerIndex
+	moves = append(moves, move)
 
-		if IsAtSameRank(kingIndex, pseudoAttackerIndex) || IsAtSameFile(kingIndex, pseudoAttackerIndex) {
-			//Get the direction
-			if IsAtSameRank(kingIndex, pseudoAttackerIndex) {
-				direction = RANK
-			} else {
-				direction = FILE
-			}
+	//Remove the pin piece from the rayline
+	ClearBit(pinPieceIndex, &rayline)
 
-			rayline = CalculateRayAttackLine(min, max, direction)
-			if bits.OnesCount64(rayline&blacks) == 0 && bits.OnesCount64(rayline&whites) == 1 {
-				pinPieceIndex = bits.TrailingZeros64(rayline & whites)
-
-				//For Rook pin attacker, only Rook and Queen can move. For FILE specifically, pawn also can move
-				switch {
-				case IsPieceAtIndex(wr, pinPieceIndex):
-					move.FromBoard = WHITE_ROOK
-					move.FromIndex = pinPieceIndex
-					move.ToBoard = WHITE_ROOK
-					//Add capture move first
-					move.ToIndex = pseudoAttackerIndex
-					pinMoves = append(pinMoves, move)
-					//Add other move between the rayline
-					for i := min + direction; i < max; i += direction {
-						if i != pinPieceIndex {
-							move.ToIndex = i
-							pinMoves = append(pinMoves, move)
-						}
-					}
-				case IsPieceAtIndex(wq, pinPieceIndex):
-					move.FromBoard = WHITE_QUEEN
-					move.FromIndex = pinPieceIndex
-					move.ToBoard = WHITE_QUEEN
-					//Add capture move first
-					move.ToIndex = pseudoAttackerIndex
-					pinMoves = append(pinMoves, move)
-					//Add other move between the rayline
-					for i := min + direction; i < max; i += direction {
-						if i != pinPieceIndex {
-							move.ToIndex = i
-							pinMoves = append(pinMoves, move)
-						}
-					}
-				case IsPieceAtIndex(wp, pinPieceIndex) && direction == FILE:
-					pawnMoves := (0x1 << (pinPieceIndex + 8)) & empty
-					pawnMoves |= (0x1 << (pinPieceIndex + 16)) & empty & (empty << 8) & RANK_4
-
-					move.FromBoard = WHITE_PAWN
-					move.FromIndex = pinPieceIndex
-					move.ToBoard = WHITE_PAWN
-					for pawnMoves != 0 {
-						index = bits.TrailingZeros64(pawnMoves)
-						move.ToIndex = index
-						pinMoves = append(pinMoves, move)
-						ClearBit(index, &pawnMoves)
-					}
-				}
-
-				ClearBitAcrossBoards(pinPieceIndex, &wp, &wr, &wn, &wb, &wq)
-			}
-		}
-
-		ClearBit(pseudoAttackerIndex, &temp)
+	//Calculate non-capture moves
+	for rayline != 0 {
+		index = bits.TrailingZeros64(rayline)
+		move.ToIndex = index
+		moves = append(moves, move)
+		ClearBit(index, &rayline)
 	}
 
-	temp = chess.Boards[BLACK_BISHOP] | chess.Boards[BLACK_QUEEN]
-	for temp != 0 {
-		pseudoAttackerIndex = bits.TrailingZeros64(temp)
-		min = Min(kingIndex, pseudoAttackerIndex)
-		max = Max(kingIndex, pseudoAttackerIndex)
+	return moves
+}
 
-		if IsAtSameDiagonal(kingIndex, pseudoAttackerIndex) || IsAtSameAntiDiagonal(kingIndex, pseudoAttackerIndex) {
-			//Calculate direction
-			if IsAtSameDiagonal(kingIndex, pseudoAttackerIndex) {
-				direction = DIAGONAL
-			} else {
-				direction = ANTI_DIAGONAL
-			}
-
-			rayline = CalculateRayAttackLine(min, max, direction)
-			if bits.OnesCount64(rayline&blacks) == 0 && bits.OnesCount64(rayline&whites) == 1 {
-				pinPieceIndex = bits.TrailingZeros64(rayline & whites)
-
-				//For DIAGONAL and ANTI_DIAGONAL, only Bishop, Queen and Pawn (capture) can move
-				switch {
-				case IsPieceAtIndex(wb, pinPieceIndex):
-					move.FromBoard = WHITE_BISHOP
-					move.FromIndex = pinPieceIndex
-					move.ToBoard = WHITE_BISHOP
-					//Add capture move first
-					move.ToIndex = pseudoAttackerIndex
-					pinMoves = append(pinMoves, move)
-					//Add other move between the rayline
-					for i := min + direction; i < max; i += direction {
-						if i != pinPieceIndex {
-							move.ToIndex = i
-							pinMoves = append(pinMoves, move)
-						}
-					}
-				case IsPieceAtIndex(wq, pinPieceIndex):
-					move.FromBoard = WHITE_QUEEN
-					move.FromIndex = pinPieceIndex
-					move.ToBoard = WHITE_QUEEN
-					//Add capture move first
-					move.ToIndex = pseudoAttackerIndex
-					pinMoves = append(pinMoves, move)
-					//Add other move between the rayline
-					for i := min + direction; i < max; i += direction {
-						if i != pinPieceIndex {
-							move.ToIndex = i
-							pinMoves = append(pinMoves, move)
-						}
-					}
-				case IsPieceAtIndex(wp, pinPieceIndex):
-					pawnMoves := (0x1 << (pinPieceIndex + direction)) & uint64(0x1<<pseudoAttackerIndex)
-					move.FromBoard = WHITE_PAWN
-					move.FromIndex = pinPieceIndex
-					if pawnMoves != 0 {
-						move.ToIndex = bits.TrailingZeros64(pawnMoves)
-						switch {
-						case 56 <= pseudoAttackerIndex && pseudoAttackerIndex <= 63:
-							move.ToBoard = WHITE_QUEEN //Promote to Queen
-							pinMoves = append(pinMoves, move)
-							move.ToBoard = WHITE_ROOK //Promote to Rook
-							pinMoves = append(pinMoves, move)
-							move.ToBoard = WHITE_BISHOP //Promote to Bishop
-							pinMoves = append(pinMoves, move)
-							move.ToBoard = WHITE_KNIGHT //Promote to Knight
-							pinMoves = append(pinMoves, move)
-						default:
-							move.ToBoard = WHITE_PAWN
-							pinMoves = append(pinMoves, move)
-						}
-					}
-				}
-
-				ClearBitAcrossBoards(pinPieceIndex, &wp, &wr, &wn, &wb, &wq)
-			}
+func (chess *Chess) PinPawnMovesInFile(pinPieceIndex int, empty uint64) []Move {
+	//Variables declaration
+	var (
+		move = Move{
+			FromBoard: WHITE_PAWN,
+			FromIndex: pinPieceIndex,
+			ToBoard:   WHITE_PAWN,
 		}
+		moves []Move
+		index int
+	)
 
-		ClearBit(pseudoAttackerIndex, &temp)
+	//In FILE, pin pawn can only advance to the front, or double push (it can't perform promotion)
+	pawnMoves := (0x1 << (pinPieceIndex + 8)) & empty
+	pawnMoves |= (0x1 << (pinPieceIndex + 16)) & empty & (empty << 8) & RANK_MASK[3]
+
+	for pawnMoves != 0 {
+		index = bits.TrailingZeros64(pawnMoves)
+		move.ToIndex = index
+		moves = append(moves, move)
+		ClearBit(index, &pawnMoves)
 	}
 
-	//Handling single check
-	if bits.OnesCount64(attackers) == 1 {
-		attackerIndex := bits.TrailingZeros64(attackers)
-		move.ToIndex = attackerIndex
+	return moves
+}
 
-		/*---Calculate attacker capturing moves---*/
-		capture := (attackers >> 7) & ^FILE_H & wp
-		capture |= (attackers >> 9) & ^FILE_A & wp
-		move.FromBoard = WHITE_PAWN
-		if 56 <= attackerIndex && attackerIndex <= 63 {
-			for capture != 0 {
-				index = bits.TrailingZeros64(capture)
-				move.FromIndex = index
+func (chess *Chess) PinPawnMovesInDiagonals(direction, pinPieceIndex, pseudoAttackerIndex, capturePiece int) []Move {
+	//Variables declaration
+	var (
+		move = Move{
+			FromBoard: WHITE_PAWN,
+			FromIndex: pinPieceIndex,
+		}
+		moves []Move
+		index int
+	)
 
-				move.ToBoard = WHITE_QUEEN //Promote to Queen
-				moves = append(moves, move)
-				move.ToBoard = WHITE_ROOK //Promote to Rook
-				moves = append(moves, move)
-				move.ToBoard = WHITE_BISHOP //Promote to Bishop
-				moves = append(moves, move)
-				move.ToBoard = WHITE_KNIGHT //Promote to Knight
-				moves = append(moves, move)
-
-				ClearBit(index, &capture)
-			}
-		} else {
+	//In DIAGONAL or ANTI_DIAGONAL, pin pawns can only perform capture (it can perform promotion)
+	pawnMoves := (0x1 << (pinPieceIndex + direction)) & uint64(0x1<<pseudoAttackerIndex)
+	if pawnMoves != 0 {
+		index = bits.TrailingZeros64(pawnMoves)
+		move.ToIndex = index
+		switch {
+		case 56 <= pseudoAttackerIndex && pseudoAttackerIndex <= 63:
+			move.ToBoard = WHITE_QUEEN //Promote to Queen
+			moves = append(moves, move)
+			move.ToBoard = WHITE_ROOK //Promote to Rook
+			moves = append(moves, move)
+			move.ToBoard = WHITE_BISHOP //Promote to Bishop
+			moves = append(moves, move)
+			move.ToBoard = WHITE_KNIGHT //Promote to Knight
+			moves = append(moves, move)
+		default:
 			move.ToBoard = WHITE_PAWN
-			for capture != 0 {
-				index = bits.TrailingZeros64(capture)
-				move.FromIndex = index
-				moves = append(moves, move)
-				ClearBit(index, &capture)
-			}
+			moves = append(moves, move)
 		}
+	}
 
-		capture |= HAndVMoves(attackerIndex, chess) & wr
-		move.FromBoard, move.ToBoard = WHITE_ROOK, WHITE_ROOK
+	return moves
+}
+
+func (chess *Chess) CaptureAttackerMoves(attacker, wp, wr, wn, wb, wq uint64, attackerIndex int) []Move {
+	//Variables declaration
+	var (
+		move = Move{
+			ToIndex: attackerIndex,
+		}
+		moves          []Move
+		index          int
+		FILE_A, FILE_H = FILE_MASK[0], FILE_MASK[7]
+	)
+
+	//Pawn capture
+	move.FromBoard = WHITE_PAWN
+	capture := (attacker >> 7) & ^FILE_H & wp
+	capture |= (attacker >> 9) & ^FILE_A & wp
+	if 56 <= attackerIndex && attackerIndex <= 63 { //Handle promotion cases
+		for capture != 0 {
+			index = bits.TrailingZeros64(capture)
+			move.FromIndex = index
+
+			move.ToBoard = WHITE_QUEEN //Promote to Queen
+			moves = append(moves, move)
+			move.ToBoard = WHITE_ROOK //Promote to Rook
+			moves = append(moves, move)
+			move.ToBoard = WHITE_BISHOP //Promote to Bishop
+			moves = append(moves, move)
+			move.ToBoard = WHITE_KNIGHT //Promote to Knight
+			moves = append(moves, move)
+
+			ClearBit(index, &capture)
+		}
+	} else { //Non promotion cases
+		move.ToBoard = WHITE_PAWN
 		for capture != 0 {
 			index = bits.TrailingZeros64(capture)
 			move.FromIndex = index
 			moves = append(moves, move)
 			ClearBit(index, &capture)
 		}
+	}
 
-		capture |= KNIGHT_ATTACK[attackerIndex] & wn
-		move.FromBoard, move.ToBoard = WHITE_KNIGHT, WHITE_KNIGHT
-		for capture != 0 {
-			index = bits.TrailingZeros64(capture)
-			move.FromIndex = index
-			moves = append(moves, move)
-			ClearBit(index, &capture)
-		}
+	//Rook capture
+	move.FromBoard, move.ToBoard = WHITE_ROOK, WHITE_ROOK
+	capture |= chess.HAndVMoves(attackerIndex) & wr
+	for capture != 0 {
+		index = bits.TrailingZeros64(capture)
+		move.FromIndex = index
+		moves = append(moves, move)
+		ClearBit(index, &capture)
+	}
 
-		capture |= DAndAntiDMoves(attackerIndex, chess) & wb
-		move.FromBoard, move.ToBoard = WHITE_BISHOP, WHITE_BISHOP
-		for capture != 0 {
-			index = bits.TrailingZeros64(capture)
-			move.FromIndex = index
-			moves = append(moves, move)
-			ClearBit(index, &capture)
-		}
+	//Knight capture
+	move.FromBoard, move.ToBoard = WHITE_KNIGHT, WHITE_KNIGHT
+	capture |= KNIGHT_ATTACK[attackerIndex] & wn
+	for capture != 0 {
+		index = bits.TrailingZeros64(capture)
+		move.FromIndex = index
+		moves = append(moves, move)
+		ClearBit(index, &capture)
+	}
 
-		capture |= (HAndVMoves(attackerIndex, chess) | DAndAntiDMoves(attackerIndex, chess)) & wq
-		move.FromBoard, move.ToBoard = WHITE_QUEEN, WHITE_QUEEN
-		for capture != 0 {
-			index = bits.TrailingZeros64(capture)
-			move.FromIndex = index
-			moves = append(moves, move)
-			ClearBit(index, &capture)
-		}
+	//Bishop capture
+	move.FromBoard, move.ToBoard = WHITE_BISHOP, WHITE_BISHOP
+	capture |= chess.DAndAntiDMoves(attackerIndex) & wb
+	for capture != 0 {
+		index = bits.TrailingZeros64(capture)
+		move.FromIndex = index
+		moves = append(moves, move)
+		ClearBit(index, &capture)
+	}
 
-		/*---Calculate attacker blocking moves---*/
-		if hasSPAttacker {
-			var blockMoves uint64
-			min = Min(attackerIndex, kingIndex)
-			max = Max(attackerIndex, kingIndex)
+	//Queen capture
+	move.FromBoard, move.ToBoard = WHITE_QUEEN, WHITE_QUEEN
+	capture |= (chess.HAndVMoves(attackerIndex) | chess.DAndAntiDMoves(attackerIndex)) & wq
+	for capture != 0 {
+		index = bits.TrailingZeros64(capture)
+		move.FromIndex = index
+		moves = append(moves, move)
+		ClearBit(index, &capture)
+	}
+
+	return moves
+}
+
+func (chess *Chess) BlockingAttackerMoves(wp, wr, wn, wb, wq uint64, attackerIndex, kingIndex int) []Move {
+	//Variables declaration
+	var (
+		move             = Move{}
+		moves            []Move
+		blockMoves       uint64
+		min              = Min(attackerIndex, kingIndex)
+		max              = Max(attackerIndex, kingIndex)
+		direction, index int
+		empty            = ^(chess.GenerateAllWhites() | chess.GenerateAllBlacks())
+		RANK_2           = RANK_MASK[1]
+	)
+
+	switch {
+	case IsAtSameRank(attackerIndex, kingIndex):
+		direction = RANK
+		//Handle pawn advance
+		move.FromBoard = WHITE_PAWN
+		for i := min + RANK; i < max; i += RANK {
+			move.ToIndex = i
+
+			blockMoves |= ((0x1 << i) >> 8) & wp
+			blockMoves |= ((0x1 << i) >> 16) & (empty >> 8) & wp & RANK_2
 
 			switch {
-			case IsAtSameRank(attackerIndex, kingIndex):
-				direction = RANK
-				//Handle pawn advance
-				move.FromBoard = WHITE_PAWN
-				for i := min + RANK; i < max; i += RANK {
-					move.ToIndex = i
+			case 56 <= i && i <= 63:
+				for blockMoves != 0 {
+					index = bits.TrailingZeros64(blockMoves)
+					move.FromIndex = index
 
-					blockMoves |= ((0x1 << i) >> 8) & wp
-					blockMoves |= ((0x1 << i) >> 16) & (empty >> 8) & wp & RANK_2
+					move.ToBoard = WHITE_QUEEN //Promote to Queen
+					moves = append(moves, move)
+					move.ToBoard = WHITE_ROOK //Promote to Rook
+					moves = append(moves, move)
+					move.ToBoard = WHITE_BISHOP //Promote to Bishop
+					moves = append(moves, move)
+					move.ToBoard = WHITE_KNIGHT //Promote to Knight
+					moves = append(moves, move)
 
-					switch {
-					case 56 <= i && i <= 63:
-						for blockMoves != 0 {
-							index = bits.TrailingZeros64(blockMoves)
-							move.FromIndex = index
-
-							move.ToBoard = WHITE_QUEEN //Promote to Queen
-							moves = append(moves, move)
-							move.ToBoard = WHITE_ROOK //Promote to Rook
-							moves = append(moves, move)
-							move.ToBoard = WHITE_BISHOP //Promote to Bishop
-							moves = append(moves, move)
-							move.ToBoard = WHITE_KNIGHT //Promote to Knight
-							moves = append(moves, move)
-
-							ClearBit(index, &blockMoves)
-						}
-					default:
-						for blockMoves != 0 {
-							index = bits.TrailingZeros64(blockMoves)
-							move.FromIndex = index
-							move.ToBoard = WHITE_PAWN
-							moves = append(moves, move)
-							ClearBit(index, &blockMoves)
-						}
-
-					}
+					ClearBit(index, &blockMoves)
 				}
-			case IsAtSameFile(attackerIndex, kingIndex):
-				direction = FILE
-			case IsAtSameDiagonal(attackerIndex, kingIndex):
-				direction = DIAGONAL
-			case IsAtSameAntiDiagonal(attackerIndex, kingIndex):
-				direction = ANTI_DIAGONAL
-			}
-
-			for i := min + int(direction); i < max; i += int(direction) {
-				if direction == DIAGONAL || direction == ANTI_DIAGONAL {
-					blockMoves |= ((0x1 << i) >> 8) & wp
-					blockMoves |= ((0x1 << i) >> 16) & (empty >> 8) & wp & RANK_2
-
-					move.FromBoard = WHITE_PAWN
+			default:
+				for blockMoves != 0 {
+					index = bits.TrailingZeros64(blockMoves)
+					move.FromIndex = index
 					move.ToBoard = WHITE_PAWN
-					move.ToIndex = i
-					for blockMoves != 0 {
-						index = bits.TrailingZeros64(blockMoves)
-						move.FromIndex = index
-						moves = append(moves, move)
-						ClearBit(index, &blockMoves)
-					}
-				}
-
-				blockMoves |= HAndVMoves(i, chess) & wr
-				move.FromBoard = WHITE_ROOK
-				move.ToBoard = WHITE_ROOK
-				move.ToIndex = i
-				for blockMoves != 0 {
-					index = bits.TrailingZeros64(blockMoves)
-					move.FromIndex = index
-					moves = append(moves, move)
-					ClearBit(index, &blockMoves)
-				}
-
-				blockMoves |= KNIGHT_ATTACK[i] & wn
-				move.FromBoard = WHITE_KNIGHT
-				move.ToBoard = WHITE_KNIGHT
-				move.ToIndex = i
-				for blockMoves != 0 {
-					index = bits.TrailingZeros64(blockMoves)
-					move.FromIndex = index
-					moves = append(moves, move)
-					ClearBit(index, &blockMoves)
-				}
-
-				blockMoves |= DAndAntiDMoves(i, chess) & wb
-				move.FromBoard = WHITE_BISHOP
-				move.ToBoard = WHITE_BISHOP
-				move.ToIndex = i
-				for blockMoves != 0 {
-					index = bits.TrailingZeros64(blockMoves)
-					move.FromIndex = index
-					moves = append(moves, move)
-					ClearBit(index, &blockMoves)
-				}
-
-				blockMoves |= (HAndVMoves(i, chess) | DAndAntiDMoves(i, chess)) & wq
-				move.FromBoard = WHITE_QUEEN
-				move.ToBoard = WHITE_QUEEN
-				move.ToIndex = i
-				for blockMoves != 0 {
-					index = bits.TrailingZeros64(blockMoves)
-					move.FromIndex = index
 					moves = append(moves, move)
 					ClearBit(index, &blockMoves)
 				}
 			}
 		}
-
-		return moves
+	case IsAtSameFile(attackerIndex, kingIndex):
+		direction = FILE
+	case IsAtSameDiagonal(attackerIndex, kingIndex):
+		direction = DIAGONAL
+	case IsAtSameAntiDiagonal(attackerIndex, kingIndex):
+		direction = ANTI_DIAGONAL
 	}
 
+	for i := min + int(direction); i < max; i += int(direction) {
+		if direction == DIAGONAL || direction == ANTI_DIAGONAL {
+			blockMoves |= ((0x1 << i) >> 8) & wp
+			blockMoves |= ((0x1 << i) >> 16) & (empty >> 8) & wp & RANK_2
+
+			move.FromBoard = WHITE_PAWN
+			move.ToBoard = WHITE_PAWN
+			move.ToIndex = i
+			for blockMoves != 0 {
+				index = bits.TrailingZeros64(blockMoves)
+				move.FromIndex = index
+				moves = append(moves, move)
+				ClearBit(index, &blockMoves)
+			}
+		}
+
+		blockMoves |= chess.HAndVMoves(i) & wr
+		move.FromBoard = WHITE_ROOK
+		move.ToBoard = WHITE_ROOK
+		move.ToIndex = i
+		for blockMoves != 0 {
+			index = bits.TrailingZeros64(blockMoves)
+			move.FromIndex = index
+			moves = append(moves, move)
+			ClearBit(index, &blockMoves)
+		}
+
+		blockMoves |= KNIGHT_ATTACK[i] & wn
+		move.FromBoard = WHITE_KNIGHT
+		move.ToBoard = WHITE_KNIGHT
+		move.ToIndex = i
+		for blockMoves != 0 {
+			index = bits.TrailingZeros64(blockMoves)
+			move.FromIndex = index
+			moves = append(moves, move)
+			ClearBit(index, &blockMoves)
+		}
+
+		blockMoves |= chess.DAndAntiDMoves(i) & wb
+		move.FromBoard = WHITE_BISHOP
+		move.ToBoard = WHITE_BISHOP
+		move.ToIndex = i
+		for blockMoves != 0 {
+			index = bits.TrailingZeros64(blockMoves)
+			move.FromIndex = index
+			moves = append(moves, move)
+			ClearBit(index, &blockMoves)
+		}
+
+		blockMoves |= (chess.HAndVMoves(i) | chess.DAndAntiDMoves(i)) & wq
+		move.FromBoard = WHITE_QUEEN
+		move.ToBoard = WHITE_QUEEN
+		move.ToIndex = i
+		for blockMoves != 0 {
+			index = bits.TrailingZeros64(blockMoves)
+			move.FromIndex = index
+			moves = append(moves, move)
+			ClearBit(index, &blockMoves)
+		}
+	}
+
+	return moves
+}
+
+func (chess *Chess) PseudoLegalMoves(wp, wr, wn, wb, wq uint64) []Move {
 	//No check
 	var (
 		pawnMoves, rookMoves, knightMoves, bishopMoves, queenMoves uint64
-		pieceIndex                                                 int
+		pieceIndex, index                                          int
+		move                                                       = Move{}
+		moves                                                      []Move
+		whites, blacks                                             = chess.GenerateAllWhites(), chess.GenerateAllBlacks()
+		empty                                                      = ^(whites | blacks)
+		RANK_4, FILE_A, FILE_H                                     = RANK_MASK[3], FILE_MASK[0], FILE_MASK[7]
 	)
 
-	pawnMoves = (wp << 8) & empty
+	/*===Pawns moves===*/
+
 	move.FromBoard = WHITE_PAWN
+	pawnMoves = (wp << 8) & empty
 	for pawnMoves != 0 {
 		index = bits.TrailingZeros64(pawnMoves)
 		move.FromIndex, move.ToIndex = index-8, index
@@ -619,6 +581,7 @@ func (chess *Chess) WhiteMoveGeneration() []Move {
 		}
 		ClearBit(index, &pawnMoves)
 	}
+
 	pawnMoves |= (wp << 16) & empty & (empty << 8) & RANK_4
 	for pawnMoves != 0 {
 		index = bits.TrailingZeros64(pawnMoves)
@@ -626,6 +589,8 @@ func (chess *Chess) WhiteMoveGeneration() []Move {
 		moves = append(moves, move)
 		ClearBit(index, &pawnMoves)
 	}
+
+	//Pawn attack to the right
 	pawnMoves |= (wp << 7) & blacks & ^FILE_A
 	for pawnMoves != 0 {
 		index = bits.TrailingZeros64(pawnMoves)
@@ -646,6 +611,8 @@ func (chess *Chess) WhiteMoveGeneration() []Move {
 		}
 		ClearBit(index, &pawnMoves)
 	}
+
+	//Pawn attack to the left
 	pawnMoves |= (wp << 9) & blacks & ^FILE_H
 	for pawnMoves != 0 {
 		index = bits.TrailingZeros64(pawnMoves)
@@ -667,12 +634,15 @@ func (chess *Chess) WhiteMoveGeneration() []Move {
 		ClearBit(index, &pawnMoves)
 	}
 
+	/*===Rooks moves===*/
+
 	move.FromBoard, move.ToBoard = WHITE_ROOK, WHITE_ROOK
 	for wr != 0 {
 		pieceIndex = bits.TrailingZeros64(wr)
 		move.FromIndex = pieceIndex
 
-		rookMoves = HAndVMoves(pieceIndex, chess) & ^whites
+		//Handle non-capture move
+		rookMoves = chess.HAndVMoves(pieceIndex) & ^whites
 		for rookMoves != 0 {
 			index = bits.TrailingZeros64(rookMoves)
 			move.ToIndex = index
@@ -682,6 +652,8 @@ func (chess *Chess) WhiteMoveGeneration() []Move {
 
 		ClearBit(pieceIndex, &wr)
 	}
+
+	/*===Knights moves===*/
 
 	move.FromBoard, move.ToBoard = WHITE_KNIGHT, WHITE_KNIGHT
 	for wn != 0 {
@@ -699,12 +671,14 @@ func (chess *Chess) WhiteMoveGeneration() []Move {
 		ClearBit(pieceIndex, &wn)
 	}
 
+	/*===Bishops moves===*/
+
 	move.FromBoard, move.ToBoard = WHITE_BISHOP, WHITE_BISHOP
 	for wb != 0 {
 		pieceIndex = bits.TrailingZeros64(wb)
 		move.FromIndex = pieceIndex
 
-		bishopMoves = DAndAntiDMoves(pieceIndex, chess) & ^whites
+		bishopMoves = chess.DAndAntiDMoves(pieceIndex) & ^whites
 		for bishopMoves != 0 {
 			index = bits.TrailingZeros64(bishopMoves)
 			move.ToIndex = index
@@ -715,12 +689,14 @@ func (chess *Chess) WhiteMoveGeneration() []Move {
 		ClearBit(pieceIndex, &wb)
 	}
 
+	/*===Queens moves===*/
+
 	move.FromBoard, move.ToBoard = WHITE_QUEEN, WHITE_QUEEN
 	for wq != 0 {
 		pieceIndex = bits.TrailingZeros64(wq)
 		move.FromIndex = pieceIndex
 
-		queenMoves = (HAndVMoves(pieceIndex, chess) | DAndAntiDMoves(pieceIndex, chess)) & ^whites
+		queenMoves = (chess.HAndVMoves(pieceIndex) | chess.DAndAntiDMoves(pieceIndex)) & ^whites
 		for queenMoves != 0 {
 			index = bits.TrailingZeros64(queenMoves)
 			move.ToIndex = index
@@ -731,11 +707,186 @@ func (chess *Chess) WhiteMoveGeneration() []Move {
 		ClearBit(pieceIndex, &wq)
 	}
 
-	//Append pin moves into list of moves
-	moves = append(moves, pinMoves...)
+	return moves
+}
 
-	//Handling castling
+func (chess *Chess) WhiteMoveGeneration() []Move {
+	var (
+		moves []Move
+
+		//Temporary bitboard (since pin pieces can only moving along the line, we remove them from the bitboard)
+		wp = chess.Boards[WHITE_PAWN]
+		wr = chess.Boards[WHITE_ROOK]
+		wn = chess.Boards[WHITE_KNIGHT]
+		wb = chess.Boards[WHITE_BISHOP]
+		wq = chess.Boards[WHITE_QUEEN]
+
+		kingIndex = bits.TrailingZeros64(chess.Boards[WHITE_KING])
+
+		whites, blacks = chess.GenerateAllWhites(), chess.GenerateAllBlacks()
+		empty          = ^(whites | blacks)
+	)
+
+	//Generate King moves
+	moves = append(moves, chess.WhiteKingMoves()...)
+
+	//Get King's attackers
+	attackers, hasSPAttacker := chess.CalculateWhiteKingAttackers()
+
+	//If this is double check, or there is only the King left, then we stop here
+	if bits.OnesCount64(attackers) > 1 || wp|wr|wn|wb|wq == 0 {
+		return moves
+	}
+
+	//Handling en passant
+	moves = append(moves, chess.EnPassantMoves()...)
+
+	/*===Calculate pin pieces===*/
+	var (
+		temp, rayline                                                         uint64
+		min, max, pseudoAttackerIndex, pinPieceIndex, direction, capturePiece int
+		pinPieceMoves                                                         []Move
+	)
+
+	//Calculate pin moves in RANK & FILE directions
+	temp = chess.Boards[BLACK_ROOK] | chess.Boards[BLACK_QUEEN]
+	for temp != 0 {
+		//Get pseudo attacker index
+		pseudoAttackerIndex = bits.TrailingZeros64(temp)
+
+		//Calculate capture piece
+		if IsPieceAtIndex(chess.Boards[BLACK_ROOK], pseudoAttackerIndex) {
+			capturePiece = BLACK_ROOK
+		} else {
+			capturePiece = BLACK_QUEEN
+		}
+
+		//Calculate the min and max of the rayline (include both the King and the enemy piece)
+		min = Min(kingIndex, pseudoAttackerIndex)
+		max = Max(kingIndex, pseudoAttackerIndex)
+
+		//Check for direction
+		switch {
+		case IsAtSameRank(kingIndex, pseudoAttackerIndex):
+			direction = RANK
+		case IsAtSameFile(kingIndex, pseudoAttackerIndex):
+			direction = FILE
+		default:
+			direction = -1
+		}
+
+		//If the direction is either RANK or FILE, calculate pin moves
+		if direction != -1 {
+			//Calculate rayline (not include the King and enemy piece)
+			rayline = CalculateRayAttackLine(min, max, direction)
+
+			//Check if there is only 1 ally piece (pin piece) between the King and enemy
+			if bits.OnesCount64(rayline&blacks) == 0 && bits.OnesCount64(rayline&whites) == 1 {
+				pinPieceIndex = bits.TrailingZeros64(rayline & whites)
+
+				//For both RANK and FILE, only Rooks and Queens can move
+				//For File specifically, Pawns can also move
+				switch {
+				case IsPieceAtIndex(wr, pinPieceIndex):
+					pinPieceMoves = append(pinPieceMoves, chess.PinSPMoves(
+						WHITE_ROOK, capturePiece, pseudoAttackerIndex, pinPieceIndex, rayline)...)
+				case IsPieceAtIndex(wq, pinPieceIndex):
+					pinPieceMoves = append(pinPieceMoves, chess.PinSPMoves(
+						WHITE_QUEEN, capturePiece, pseudoAttackerIndex, pinPieceIndex, rayline)...)
+				case direction == FILE && IsPieceAtIndex(wp, pinPieceIndex):
+					pinPieceMoves = append(pinPieceMoves, chess.PinPawnMovesInFile(pinPieceIndex, empty)...)
+				}
+
+				//Clear the pin piece out of the temporary bitboards
+				ClearBitAcrossBoards(pinPieceIndex, &wp, &wr, &wn, &wb, &wq)
+			}
+
+		}
+
+		ClearBit(pseudoAttackerIndex, &temp)
+	}
+
+	//Calculate pin moves in DIAGONAL & ANTI_DIAGONAL directions
+	temp = chess.Boards[BLACK_BISHOP] | chess.Boards[BLACK_QUEEN]
+	for temp != 0 {
+		//Get pseudo attacker index
+		pseudoAttackerIndex = bits.TrailingZeros64(temp)
+
+		//Calculate capture piece
+		if IsPieceAtIndex(chess.Boards[BLACK_BISHOP], pseudoAttackerIndex) {
+			capturePiece = BLACK_BISHOP
+		} else {
+			capturePiece = BLACK_QUEEN
+		}
+
+		//Calculate the min and max of the rayline (include both the King and the enemy piece)
+		min = Min(kingIndex, pseudoAttackerIndex)
+		max = Max(kingIndex, pseudoAttackerIndex)
+
+		//Check for direction
+		switch {
+		case IsAtSameDiagonal(kingIndex, pseudoAttackerIndex):
+			direction = DIAGONAL
+		case IsAtSameAntiDiagonal(kingIndex, pseudoAttackerIndex):
+			direction = ANTI_DIAGONAL
+		default:
+			direction = -1
+		}
+
+		//If the direction is either DIAGONAL or ANTI_DIAGONAL, calculate pin moves
+		if direction != -1 {
+			//Calculate rayline (not include the King and enemy piece)
+			rayline = CalculateRayAttackLine(min, max, direction)
+
+			//Check if there is only 1 ally piece (pin piece) between the King and enemy
+			if bits.OnesCount64(rayline&blacks) == 0 && bits.OnesCount64(rayline&whites) == 1 {
+				pinPieceIndex = bits.TrailingZeros64(rayline & whites)
+
+				//For both DIAGONAL and ANTI_DIAGONAL, only Bishops, Queens and Pawns can move
+				switch {
+				case IsPieceAtIndex(wb, pinPieceIndex):
+					pinPieceMoves = append(pinPieceMoves, chess.PinSPMoves(
+						WHITE_BISHOP, capturePiece, pseudoAttackerIndex, pinPieceIndex, rayline)...)
+				case IsPieceAtIndex(wq, pinPieceIndex):
+					pinPieceMoves = append(pinPieceMoves, chess.PinSPMoves(
+						WHITE_QUEEN, capturePiece, pseudoAttackerIndex, pinPieceIndex, rayline)...)
+				case IsPieceAtIndex(wp, pinPieceIndex):
+					pinPieceMoves = append(pinPieceMoves, chess.PinPawnMovesInDiagonals(direction, pinPieceIndex, pseudoAttackerIndex, BLACK_BISHOP)...)
+				}
+
+				ClearBitAcrossBoards(pinPieceIndex, &wp, &wr, &wn, &wb, &wq)
+			}
+
+		}
+
+		ClearBit(pseudoAttackerIndex, &temp)
+	}
+
+	/*===Handling single check===*/
+	if bits.OnesCount64(attackers) == 1 {
+		attackerIndex := bits.TrailingZeros64(attackers)
+
+		//Calculate capture attacker move
+		moves = append(moves, chess.CaptureAttackerMoves(attackers, wp, wr, wn, wb, wq, attackerIndex)...)
+
+		//Calculate blocking attacker move
+		if hasSPAttacker {
+			moves = append(moves, chess.BlockingAttackerMoves(wp, wr, wn, wb, wq, attackerIndex, kingIndex)...)
+		}
+
+		return moves
+	}
+
+	/*===No check case===*/
+	//Append pseudo legal moves (which in this case, legal)
+	moves = append(moves, chess.PseudoLegalMoves(wp, wr, wn, wb, wq)...)
+
+	//Append pin pieces' moves
+	moves = append(moves, pinPieceMoves...)
+
+	/*===Handling castling cases===*/
 	whiteKingInDanger := chess.GenerateWhiteKingInDanger()
+	move := Move{}
 	if (chess.CastlingPrivilege&int(WHITE_KING_SIDE)) == int(WHITE_KING_SIDE) && (empty&0x6) == 0x6 && (whiteKingInDanger&0xE) == 0 {
 		move.Castling = WHITE_KING_SIDE
 		moves = append(moves, move)
@@ -753,7 +904,7 @@ func (chess *Chess) MoveGeneration() []Move {
 	if chess.SideToMove == BLACK {
 		chess.Flip()
 		moves := chess.WhiteMoveGeneration()
-		chess.Flip()
+		defer chess.Flip()
 
 		reflectMoves := []Move{}
 		for _, move := range moves {
@@ -767,9 +918,9 @@ func (chess *Chess) MoveGeneration() []Move {
 			default:
 				move.FromBoard += 6
 				move.ToBoard += 6
-				move.FromIndex, move.ToIndex = FlipIndexVertical(move.FromIndex), FlipIndexVertical(move.ToIndex)
+				move.FromIndex = FlipIndexVertical(move.FromIndex)
+				move.ToIndex = FlipIndexVertical(move.ToIndex)
 				reflectMoves = append(reflectMoves, move)
-				//fmt.Printf("Flip move: %s\n", move.String())
 			}
 		}
 		return reflectMoves
