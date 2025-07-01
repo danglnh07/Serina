@@ -7,8 +7,8 @@
 - Display chessboard in an easy-to-understand format
 - Move generation
 - Perft function (performance testing)
-- Simple static evaluation (still update)
-- Negamax search with alpha-beta pruning (still update)
+- Simple static evaluation
+- Negamax search with alpha-beta pruning
 - Move ordering (still update)
 
 ## How to use
