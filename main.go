@@ -8,11 +8,10 @@ import (
 	"os/exec"
 	"runtime"
 	"serina/engine"
+	"serina/web-ui/server"
 	"strings"
 	"time"
 )
-
-var history []*engine.Chess
 
 func Clear() {
 	var cmd *exec.Cmd
@@ -25,23 +24,7 @@ func Clear() {
 	cmd.Run()
 }
 
-func IsEndgame(chess *engine.Chess) (bool, string) {
-	if len(chess.MoveGeneration()) == 0 {
-		if chess.IsBlackKingChecked() {
-			return true, "White win"
-		}
-
-		if chess.IsWhiteKingChecked() {
-			return true, "Black win"
-		}
-
-		return true, "Stalemate"
-	}
-
-	return false, ""
-}
-
-func main() {
+func CLI() {
 	//Create chess instance
 	chess := engine.NewChess()
 
@@ -73,23 +56,19 @@ func main() {
 
 			//Import FEN and display the chessboard
 			chess.FEN(fen)
-			chess.Print()
-
-			isEndGame, message := IsEndgame(chess)
-			if isEndGame {
-				fmt.Println(message)
-			}
+			fmt.Println(chess)
 		case "display":
 			//Display the chessboard
-			chess.Print()
+			fmt.Println(chess)
 		case "move_gen":
 			//Generate all moves
 			moves := chess.MoveGeneration()
 
 			//Format to string and print to standard output
+			fmt.Println("Number of moves: ", len(moves))
 			str := "All moves available: ["
 			for _, move := range moves {
-				str += move + " ,"
+				str += move.String() + ", "
 			}
 			str = str[:len(str)-1] + "]"
 			fmt.Println(str)
@@ -103,29 +82,9 @@ func main() {
 			}
 			move = strings.TrimSpace(move)
 
-			//Store the old value of chess for unmake
-			history = append(history, chess.Clone()) //Sunce we store a pointer, we have to clone it
-
 			//Make move and display
-			chess.MakeMove(move)
-			chess.Print()
-
-			isEndGame, message := IsEndgame(chess)
-			if isEndGame {
-				fmt.Println(message)
-			}
-		case "unmake":
-			//Check if the history still have data for unmake
-			if len(history) <= 0 {
-				fmt.Println("No move for unmake")
-			} else {
-				//Copy the top most of the history
-				chess.Copy(history[len(history)-1])
-				//Remove the record
-				history = history[:len(history)-1]
-				//Print the board
-				chess.Print()
-			}
+			chess.MakeMove(engine.NewMove(chess, move))
+			fmt.Println(chess)
 		case "perft":
 			//Get the depth from user
 			fmt.Print("Enter depth: ")
@@ -134,8 +93,12 @@ func main() {
 
 			//Perform perft
 			start := time.Now()
-			chess.FastPerft(depth)
+			res, total := chess.FastPerft(depth)
 			elapsed := time.Since(start)
+			for key, val := range res {
+				fmt.Printf("%s: %d\n", key, val)
+			}
+			fmt.Printf("Total node found: %d\n", total)
 			fmt.Printf("Took %d ms (%.2f seconds)\n", elapsed.Milliseconds(), elapsed.Seconds())
 		case "evaluate":
 			fmt.Println("Current position evaluation: ", chess.Evaluate())
@@ -147,14 +110,35 @@ func main() {
 
 			//Perform search
 			start := time.Now()
-			_, search := chess.Search(depth, -math.MaxInt32, math.MaxInt32)
+			_, searchedMove := chess.Search(depth, -math.MaxInt32, math.MaxInt32)
 			elapsed := time.Since(start)
-			fmt.Println("Found move: ", search)
+			fmt.Println("Found move: ", searchedMove)
+			fmt.Printf("Took %d ms (%.2f seconds)\n", elapsed.Milliseconds(), elapsed.Seconds())
+		case "test":
+			//Get the depth from user
+			fmt.Print("Enter depth: ")
+			var depth int
+			fmt.Scanf("%d\n", &depth)
+
+			//Perform search
+			start := time.Now()
+			total := chess.Perft(depth)
+			elapsed := time.Since(start)
+			fmt.Println("Total nodes: ", total)
 			fmt.Printf("Took %d ms (%.2f seconds)\n", elapsed.Milliseconds(), elapsed.Seconds())
 		case "clear":
 			Clear()
 		case "exit":
 			return
 		}
+	}
+}
+
+func main() {
+	if len(os.Args) == 1 {
+		CLI()
+	} else {
+		server := server.NewServer()
+		server.Start()
 	}
 }

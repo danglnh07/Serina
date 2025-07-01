@@ -16,13 +16,13 @@ type Move struct {
 func (move Move) String() string {
 	switch move.Castling {
 	case WHITE_KING_SIDE:
-		return "e1g1"
+		return "O-O"
 	case WHITE_QUEEN_SIDE:
-		return "e1c1"
+		return "O-O-O"
 	case BLACK_KING_SIDE:
-		return "e8g8"
+		return "o-o"
 	case BLACK_QUEEN_SIDE:
-		return "e8c8"
+		return "o-o-o"
 	default:
 		str := fmt.Sprintf("%s%s", FromIndexToAlgebraic(move.FromIndex), FromIndexToAlgebraic(move.ToIndex))
 		if move.ToBoard != move.FromBoard {

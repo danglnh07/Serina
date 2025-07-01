@@ -6,83 +6,86 @@ import (
 
 var (
 	//Material value of each piece type (centipawn)
-	pawnMat   = 100
-	knightMat = 320
-	bishopMat = 330
-	rookMat   = 500
-	queenMat  = 900
-	kingMat   = 20000
+	material = map[int]int{
+		WHITE_PAWN:   100,
+		WHITE_ROOK:   500,
+		WHITE_KNIGHT: 320,
+		WHITE_BISHOP: 330,
+		WHITE_QUEEN:  900,
+		WHITE_KING:   20000,
+	}
 
 	//Piece-square value (https://www.chessprogramming.org/Simplified_Evaluation_Function)
-	//This is for white perspective
-	pawnPS = []int{
-		0, 0, 0, 0, 0, 0, 0, 0,
-		50, 50, 50, 50, 50, 50, 50, 50,
-		10, 10, 20, 30, 30, 20, 10, 10,
-		5, 5, 10, 25, 25, 10, 5, 5,
-		0, 0, 0, 20, 20, 0, 0, 0,
-		5, -5, -10, 0, 0, -10, -5, 5,
-		5, 10, 10, -20, -20, 10, 10, 5,
-		0, 0, 0, 0, 0, 0, 0, 0,
-	}
+	piece_square_table = map[int][]int{
+		WHITE_PAWN: {
+			0, 0, 0, 0, 0, 0, 0, 0,
+			50, 50, 50, 50, 50, 50, 50, 50,
+			10, 10, 20, 30, 30, 20, 10, 10,
+			5, 5, 10, 25, 25, 10, 5, 5,
+			0, 0, 0, 20, 20, 0, 0, 0,
+			5, -5, -10, 0, 0, -10, -5, 5,
+			5, 10, 10, -20, -20, 10, 10, 5,
+			0, 0, 0, 0, 0, 0, 0, 0,
+		},
 
-	knightPS = []int{
-		-50, -40, -30, -30, -30, -30, -40, -50,
-		-40, -20, 0, 0, 0, 0, -20, -40,
-		-30, 0, 10, 15, 15, 10, 0, -30,
-		-30, 5, 15, 20, 20, 15, 5, -30,
-		-30, 0, 15, 20, 20, 15, 0, -30,
-		-30, 5, 10, 15, 15, 10, 5, -30,
-		-40, -20, 0, 5, 5, 0, -20, -40,
-		-50, -40, -30, -30, -30, -30, -40, -50,
-	}
+		WHITE_ROOK: {
+			0, 0, 0, 0, 0, 0, 0, 0,
+			5, 10, 10, 10, 10, 10, 10, 5,
+			-5, 0, 0, 0, 0, 0, 0, -5,
+			-5, 0, 0, 0, 0, 0, 0, -5,
+			-5, 0, 0, 0, 0, 0, 0, -5,
+			-5, 0, 0, 0, 0, 0, 0, -5,
+			-5, 0, 0, 0, 0, 0, 0, -5,
+			0, 0, 0, 5, 5, 0, 0, 0,
+		},
 
-	bishopPS = []int{
-		-20, -10, -10, -10, -10, -10, -10, -20,
-		-10, 0, 0, 0, 0, 0, 0, -10,
-		-10, 0, 5, 10, 10, 5, 0, -10,
-		-10, 5, 5, 10, 10, 5, 5, -10,
-		-10, 0, 10, 10, 10, 10, 0, -10,
-		-10, 10, 10, 10, 10, 10, 10, -10,
-		-10, 5, 0, 0, 0, 0, 5, -10,
-		-20, -10, -10, -10, -10, -10, -10, -20,
-	}
+		WHITE_KNIGHT: {
+			-50, -40, -30, -30, -30, -30, -40, -50,
+			-40, -20, 0, 0, 0, 0, -20, -40,
+			-30, 0, 10, 15, 15, 10, 0, -30,
+			-30, 5, 15, 20, 20, 15, 5, -30,
+			-30, 0, 15, 20, 20, 15, 0, -30,
+			-30, 5, 10, 15, 15, 10, 5, -30,
+			-40, -20, 0, 5, 5, 0, -20, -40,
+			-50, -40, -30, -30, -30, -30, -40, -50,
+		},
 
-	rookPS = []int{
-		0, 0, 0, 0, 0, 0, 0, 0,
-		5, 10, 10, 10, 10, 10, 10, 5,
-		-5, 0, 0, 0, 0, 0, 0, -5,
-		-5, 0, 0, 0, 0, 0, 0, -5,
-		-5, 0, 0, 0, 0, 0, 0, -5,
-		-5, 0, 0, 0, 0, 0, 0, -5,
-		-5, 0, 0, 0, 0, 0, 0, -5,
-		0, 0, 0, 5, 5, 0, 0, 0,
-	}
+		WHITE_BISHOP: {
+			-20, -10, -10, -10, -10, -10, -10, -20,
+			-10, 0, 0, 0, 0, 0, 0, -10,
+			-10, 0, 5, 10, 10, 5, 0, -10,
+			-10, 5, 5, 10, 10, 5, 5, -10,
+			-10, 0, 10, 10, 10, 10, 0, -10,
+			-10, 10, 10, 10, 10, 10, 10, -10,
+			-10, 5, 0, 0, 0, 0, 5, -10,
+			-20, -10, -10, -10, -10, -10, -10, -20,
+		},
 
-	queenPS = []int{
-		-20, -10, -10, -5, -5, -10, -10, -20,
-		-10, 0, 0, 0, 0, 0, 0, -10,
-		-10, 0, 5, 5, 5, 5, 0, -10,
-		-5, 0, 5, 5, 5, 5, 0, -5,
-		0, 0, 5, 5, 5, 5, 0, -5,
-		-10, 5, 5, 5, 5, 5, 0, -10,
-		-10, 0, 5, 0, 0, 0, 0, -10,
-		-20, -10, -10, -5, -5, -10, -10, -20,
-	}
+		WHITE_QUEEN: {
+			-20, -10, -10, -5, -5, -10, -10, -20,
+			-10, 0, 0, 0, 0, 0, 0, -10,
+			-10, 0, 5, 5, 5, 5, 0, -10,
+			-5, 0, 5, 5, 5, 5, 0, -5,
+			0, 0, 5, 5, 5, 5, 0, -5,
+			-10, 5, 5, 5, 5, 5, 0, -10,
+			-10, 0, 5, 0, 0, 0, 0, -10,
+			-20, -10, -10, -5, -5, -10, -10, -20,
+		},
 
-	kingPS = []int{
-		-30, -40, -40, -50, -50, -40, -40, -30,
-		-30, -40, -40, -50, -50, -40, -40, -30,
-		-30, -40, -40, -50, -50, -40, -40, -30,
-		-30, -40, -40, -50, -50, -40, -40, -30,
-		-20, -30, -30, -40, -40, -30, -30, -20,
-		-10, -20, -20, -20, -20, -20, -20, -10,
-		20, 20, 0, 0, 0, 0, 20, 20,
-		20, 30, 10, 0, 0, 10, 30, 20,
+		WHITE_KING: {
+			-30, -40, -40, -50, -50, -40, -40, -30,
+			-30, -40, -40, -50, -50, -40, -40, -30,
+			-30, -40, -40, -50, -50, -40, -40, -30,
+			-30, -40, -40, -50, -50, -40, -40, -30,
+			-20, -30, -30, -40, -40, -30, -30, -20,
+			-10, -20, -20, -20, -20, -20, -20, -10,
+			20, 20, 0, 0, 0, 0, 20, 20,
+			20, 30, 10, 0, 0, 10, 30, 20,
+		},
 	}
 )
 
-func EvaluatePS(bitboard uint64, piece_square []int, side Color) int {
+func EvaluatePS(bitboard uint64, piece_square []int, side int) int {
 	var (
 		index, res int
 	)
@@ -90,7 +93,6 @@ func EvaluatePS(bitboard uint64, piece_square []int, side Color) int {
 	for bitboard != 0 {
 		index = 63 - bits.TrailingZeros64(bitboard) //bitboard and normal array has reverse index
 		if side == BLACK {
-			//If this is BLACK, get the mirror value of the PST (flipping vertically)
 			res += piece_square[FlipIndexVertical(index)]
 		} else {
 			res += piece_square[index]
@@ -101,117 +103,61 @@ func EvaluatePS(bitboard uint64, piece_square []int, side Color) int {
 	return res
 }
 
-func (chess *Chess) CalculateBonus(side Color) int {
+func (chess *Chess) CalculateBonus() int {
 	/*
 	 * Refer to the rule state in chessprograming wiki: https://www.chessprogramming.org/Material
 	 * All the bonus/penalty point can be tune further
+	 * This is based on White perspective, for Black we'll flip the board and reuse White logic
 	 */
-	var bonus = 0
-
-	if side == WHITE {
-		//Bonus for pair bishop
-		if bits.OnesCount64(chess.WhiteBishops) >= 2 {
-			bonus += 66
-		}
-
-		//Penalty for knight pair
-		if bits.OnesCount64(chess.WhiteKnights) >= 2 {
-			bonus -= 64
-		}
-
-		//Penalty for rook pair
-		if bits.OnesCount64(chess.WhiteRooks) >= 2 {
-			bonus -= 100
-		}
-
-		//Bonus for pair queen (encourage promotion to queen)
-		if bits.OnesCount64(chess.WhiteQueens) >= 2 {
-			bonus -= 180
-		}
-
-		//Penalty for not having any pawn left (harder for checkmate in endgame)
-		if bits.OnesCount64(chess.WhitePawns) == 0 {
-			bonus -= 300
-		}
-
-		return bonus
+	if chess.SideToMove == BLACK {
+		chess.Flip()
+		defer chess.Flip()
 	}
 
-	//Black side
+	var bonus = 0
+
 	//Bonus for pair bishop
-	if bits.OnesCount64(chess.BlackBishops) >= 2 {
+	if bits.OnesCount64(chess.Boards[WHITE_BISHOP]) >= 2 {
 		bonus += 66
 	}
 
 	//Penalty for knight pair
-	if bits.OnesCount64(chess.BlackKnights) >= 2 {
+	if bits.OnesCount64(chess.Boards[WHITE_KNIGHT]) >= 2 {
 		bonus -= 64
 	}
 
 	//Penalty for rook pair
-	if bits.OnesCount64(chess.BlackRooks) >= 2 {
+	if bits.OnesCount64(chess.Boards[WHITE_ROOK]) >= 2 {
 		bonus -= 100
 	}
 
 	//Bonus for pair queen (encourage promotion to queen)
-	if bits.OnesCount64(chess.BlackQueens) >= 2 {
+	if bits.OnesCount64(chess.Boards[WHITE_QUEEN]) >= 2 {
 		bonus -= 180
 	}
 
 	//Penalty for not having any pawn left (harder for checkmate in endgame)
-	if bits.OnesCount64(chess.BlackPawns) == 0 {
+	if bits.OnesCount64(chess.Boards[WHITE_PAWN]) == 0 {
 		bonus -= 300
 	}
 
-	return -bonus //For Black, more negative is more advantage
+	return bonus
 }
 
 func (chess *Chess) Evaluate() int {
 	//Calculate material value
-	material := 0
+	mat := 0
 
-	material += (bits.OnesCount64(chess.WhitePawns) - bits.OnesCount64(chess.BlackPawns)) * pawnMat
-	material += (bits.OnesCount64(chess.WhiteRooks) - bits.OnesCount64(chess.BlackRooks)) * rookMat
-	material += (bits.OnesCount64(chess.WhiteKnights) - bits.OnesCount64(chess.BlackKnights)) * knightMat
-	material += (bits.OnesCount64(chess.WhiteBishops) - bits.OnesCount64(chess.BlackBishops)) * bishopMat
-	material += (bits.OnesCount64(chess.WhiteQueens) - bits.OnesCount64(chess.BlackQueens)) * queenMat
-	material += (bits.OnesCount64(chess.WhiteKing) - bits.OnesCount64(chess.BlackKing)) * kingMat
+	for i := WHITE_PAWN; i <= WHITE_KING; i++ {
+		mat += (bits.OnesCount64(chess.Boards[i]) - bits.OnesCount64(chess.Boards[i+6])) * material[i]
+	}
 
 	//Calculate piece square table
-	var (
-		temp         uint64
-		piece_square int
-	)
+	ps := 0
+	for i := WHITE_PAWN; i <= WHITE_KING; i++ {
+		ps += EvaluatePS(chess.Boards[i], piece_square_table[i], WHITE)
+		ps -= EvaluatePS(chess.Boards[i+6], piece_square_table[i], BLACK)
+	}
 
-	temp = chess.WhitePawns
-	piece_square += EvaluatePS(temp, pawnPS, WHITE)
-	temp = chess.BlackPawns
-	piece_square += EvaluatePS(temp, pawnPS, BLACK)
-
-	temp = chess.WhiteRooks
-	piece_square += EvaluatePS(temp, rookPS, WHITE)
-	temp = chess.BlackRooks
-	piece_square += EvaluatePS(temp, rookPS, BLACK)
-
-	temp = chess.WhiteKnights
-	piece_square += EvaluatePS(temp, knightPS, WHITE)
-	temp = chess.BlackKnights
-	piece_square += EvaluatePS(temp, knightPS, BLACK)
-
-	temp = chess.WhiteBishops
-	piece_square += EvaluatePS(temp, bishopPS, WHITE)
-	temp = chess.BlackBishops
-	piece_square += EvaluatePS(temp, bishopPS, BLACK)
-
-	temp = chess.WhiteQueens
-	piece_square += EvaluatePS(temp, queenPS, WHITE)
-	temp = chess.BlackQueens
-	piece_square += EvaluatePS(temp, queenPS, BLACK)
-
-	temp = chess.WhiteKing
-	piece_square += EvaluatePS(temp, kingPS, WHITE)
-	temp = chess.BlackKing
-	piece_square += EvaluatePS(temp, kingPS, BLACK)
-
-	return material + piece_square + chess.CalculateBonus(WHITE) + chess.CalculateBonus(BLACK)
+	return mat + ps + chess.CalculateBonus()
 }
